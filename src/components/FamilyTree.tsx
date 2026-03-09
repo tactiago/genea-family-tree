@@ -100,18 +100,14 @@ const FamilyTree: React.FC<FamilyTreeProps> = ({ onSelectPerson }) => {
     return { initialNodes: layoutedNodes, initialEdges: layoutedEdges };
   }, [persons, relationships, onSelectPerson]);
 
-  const [nodes, , onNodesChange] = useNodesState(initialNodes);
-  const [edges, , onEdgesChange] = useEdgesState(initialEdges);
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
   // Sync when data changes
   React.useEffect(() => {
-    onNodesChange(
-      initialNodes.map((n) => ({ type: 'reset' as const, item: n }))
-    );
-    onEdgesChange(
-      initialEdges.map((e) => ({ type: 'reset' as const, item: e }))
-    );
-  }, [initialNodes, initialEdges]);
+    setNodes(initialNodes);
+    setEdges(initialEdges);
+  }, [initialNodes, initialEdges, setNodes, setEdges]);
 
   if (persons.length === 0) {
     return (
