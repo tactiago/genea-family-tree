@@ -1,15 +1,113 @@
-import React from 'react';
+import React, { useMemo, useCallback } from 'react';
+import {
+  ReactFlow,
+  Background,
+  Controls,
+  useNodesState,
+  useEdgesState,
+  type Node,
+  type Edge,
+  ConnectionLineType,
+  BackgroundVariant,
+} from '@xyflow/react';
+import '@xyflow/react/dist/style.css';
+import dagre from 'dagre';
 import { useFamily } from '@/contexts/FamilyContext';
-import { getRootPersons, Person } from '@/types/family';
-import TreeNode from './TreeNode';
+import { Person, getChildren, getSpouses, getRootPersons } from '@/types/family';
+import FamilyTreeNode from './FamilyTreeNode';
+import SpouseEdge from './SpouseEdge';
 import { TreesIcon } from 'lucide-react';
 
 interface FamilyTreeProps {
   onSelectPerson: (person: Person) => void;
 }
 
+const nodeTypes = { familyNode: FamilyTreeNode };
+const edgeTypes = { spouse: SpouseEdge };
+
+const NODE_WIDTH = 140;
+const NODE_HEIGHT = 100;
+
+const getLayoutedElements = (nodes: Node[], edges: Edge[]) => {
+  const g = new dagre.graphlib.Graph();
+  g.setDefaultEdgeLabel(() => ({}));
+  g.setGraph({ rankdir: 'TB', ranksep: 80, nodesep: 40 });
+
+  nodes.forEach((node) => {
+    g.setNode(node.id, { width: NODE_WIDTH, height: NODE_HEIGHT });
+  });
+
+  // Only use parent edges for hierarchy layout
+  edges.filter(e => e.type !== 'spouse').forEach((edge) => {
+    g.setEdge(edge.source, edge.target);
+  });
+
+  dagre.layout(g);
+
+  const layoutedNodes = nodes.map((node) => {
+    const pos = g.node(node.id);
+    return {
+      ...node,
+      position: { x: pos.x - NODE_WIDTH / 2, y: pos.y - NODE_HEIGHT / 2 },
+    };
+  });
+
+  return { nodes: layoutedNodes, edges };
+};
+
 const FamilyTree: React.FC<FamilyTreeProps> = ({ onSelectPerson }) => {
   const { persons, relationships } = useFamily();
+
+  const { initialNodes, initialEdges } = useMemo(() => {
+    if (persons.length === 0) return { initialNodes: [], initialEdges: [] };
+
+    const nodes: Node[] = persons.map((person) => ({
+      id: person.id,
+      type: 'familyNode',
+      position: { x: 0, y: 0 },
+      data: { person, onSelect: onSelectPerson },
+    }));
+
+    const edges: Edge[] = [];
+    const addedEdges = new Set<string>();
+
+    relationships.forEach((rel) => {
+      const edgeId = `${rel.personId}-${rel.relatedPersonId}-${rel.type}`;
+      if (addedEdges.has(edgeId)) return;
+      addedEdges.add(edgeId);
+
+      if (rel.type === 'parent') {
+        // parent → child: relatedPersonId is the parent, personId is the child
+        edges.push({
+          id: edgeId,
+          source: rel.relatedPersonId,
+          target: rel.personId,
+          type: 'smoothstep',
+          style: { stroke: 'hsl(var(--tree-line))', strokeWidth: 2 },
+          animated: false,
+        });
+      } else if (rel.type === 'spouse') {
+        edges.push({
+          id: edgeId,
+          source: rel.personId,
+          target: rel.relatedPersonId,
+          type: 'spouse',
+        });
+      }
+    });
+
+    const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(nodes, edges);
+    return { initialNodes: layoutedNodes, initialEdges: layoutedEdges };
+  }, [persons, relationships, onSelectPerson]);
+
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+
+  // Sync when data changes
+  React.useEffect(() => {
+    setNodes(initialNodes);
+    setEdges(initialEdges);
+  }, [initialNodes, initialEdges, setNodes, setEdges]);
 
   if (persons.length === 0) {
     return (
@@ -25,28 +123,29 @@ const FamilyTree: React.FC<FamilyTreeProps> = ({ onSelectPerson }) => {
     );
   }
 
-  const roots = getRootPersons(persons, relationships);
-  
-  // Persons that are spouses but not roots (they're shown alongside their spouse)
-  const spouseIds = new Set<string>();
-  relationships.filter(r => r.type === 'spouse').forEach(r => {
-    const p1IsRoot = roots.some(p => p.id === r.personId);
-    const p2IsRoot = roots.some(p => p.id === r.relatedPersonId);
-    if (p1IsRoot && p2IsRoot) {
-      // Both are roots, remove one
-      spouseIds.add(r.relatedPersonId);
-    }
-  });
-
-  const displayRoots = roots.filter(p => !spouseIds.has(p.id));
-
   return (
-    <div className="overflow-x-auto pb-8">
-      <div className="inline-flex flex-col items-center gap-8 min-w-full px-4 py-6">
-        {displayRoots.map(root => (
-          <TreeNode key={root.id} person={root} onSelect={onSelectPerson} />
-        ))}
-      </div>
+    <div className="w-full h-[calc(100vh-180px)] min-h-[400px] rounded-xl overflow-hidden border border-border bg-card">
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
+        connectionLineType={ConnectionLineType.SmoothStep}
+        fitView
+        fitViewOptions={{ padding: 0.3 }}
+        nodesDraggable={true}
+        nodesConnectable={false}
+        elementsSelectable={false}
+        proOptions={{ hideAttribution: true }}
+      >
+        <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="hsl(var(--border))" />
+        <Controls
+          showInteractive={false}
+          className="!bg-card !border-border !shadow-md [&>button]:!bg-card [&>button]:!border-border [&>button]:!text-foreground [&>button:hover]:!bg-muted"
+        />
+      </ReactFlow>
     </div>
   );
 };
