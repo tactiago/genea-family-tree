@@ -1,5 +1,5 @@
 import React, { useState, useRef, ChangeEvent, useEffect, useCallback } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useFamily } from '@/contexts/FamilyContext';
 import { Person, getFullName, FamilyState } from '@/types/family';
 import Header from '@/components/Header';
@@ -30,6 +30,7 @@ type LocationState = { action?: 'add' | 'import' | 'example' };
 
 const TreePage = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const { persons, relationships, deletePerson, addRelationship, importState } = useFamily();
   const [showForm, setShowForm] = useState(false);
   const [editPerson, setEditPerson] = useState<Person | undefined>();
@@ -73,17 +74,20 @@ const TreePage = () => {
     const state = location.state as LocationState | null;
     const action = state?.action;
     if (action === 'add') {
+      navigate(location.pathname, { replace: true, state: {} });
       setShowForm(true);
     } else if (action === 'import') {
+      navigate(location.pathname, { replace: true, state: {} });
       fileInputRef.current?.click();
     } else if (action === 'example') {
+      navigate(location.pathname, { replace: true, state: {} }); // Limpa state para não re-executar quando persons mudar
       if (persons.length > 0) {
         setShowViewExampleDialog(true);
       } else {
         loadExampleTree();
       }
     }
-  }, [location.state, persons.length, loadExampleTree]);
+  }, [location.state, location.pathname, persons.length, loadExampleTree, navigate]);
 
   const handleViewExample = () => {
     if (persons.length > 0) {
