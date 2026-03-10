@@ -8,6 +8,9 @@ interface PersonFormProps {
   person?: Person;
   onClose: () => void;
   onSave: () => void;
+  linkAsParentOfId?: string;
+  linkAsChildOfId?: string;
+  linkAsSpouseOfId?: string;
 }
 
 type Tab = 'basic' | 'contact' | 'bio' | 'relations';
@@ -19,7 +22,14 @@ const tabs: { id: Tab; label: string }[] = [
   { id: 'relations', label: 'Relações' },
 ];
 
-const PersonForm: React.FC<PersonFormProps> = ({ person, onClose, onSave }) => {
+const PersonForm: React.FC<PersonFormProps> = ({
+  person,
+  onClose,
+  onSave,
+  linkAsParentOfId,
+  linkAsChildOfId,
+  linkAsSpouseOfId,
+}) => {
   const { addPerson, updatePerson, persons, addRelationship, relationships, removeRelationship } = useFamily();
   const [tab, setTab] = useState<Tab>('basic');
   const [data, setData] = useState(person ? { ...person } : { ...createEmptyPerson() } as any);
@@ -62,6 +72,34 @@ const PersonForm: React.FC<PersonFormProps> = ({ person, onClose, onSave }) => {
       addRelationship({ personId: savedPerson.id, relatedPersonId: sid, type: 'spouse' });
     });
 
+    // Linkagem rápida quando o formulário é aberto a partir dos atalhos
+    // de "Adicionar pai/mãe/filho/cônjuge" na ficha de detalhes.
+    if (!person) {
+      if (linkAsParentOfId) {
+        // Nova pessoa será pai/mãe de linkAsParentOfId
+        addRelationship({
+          personId: linkAsParentOfId,
+          relatedPersonId: savedPerson.id,
+          type: 'parent',
+        });
+      }
+      if (linkAsChildOfId) {
+        // Nova pessoa será filho(a) de linkAsChildOfId
+        addRelationship({
+          personId: savedPerson.id,
+          relatedPersonId: linkAsChildOfId,
+          type: 'parent',
+        });
+      }
+      if (linkAsSpouseOfId) {
+        addRelationship({
+          personId: savedPerson.id,
+          relatedPersonId: linkAsSpouseOfId,
+          type: 'spouse',
+        });
+      }
+    }
+
     onSave();
   };
 
@@ -69,6 +107,10 @@ const PersonForm: React.FC<PersonFormProps> = ({ person, onClose, onSave }) => {
 
   const toggleInList = (list: string[], setList: React.Dispatch<React.SetStateAction<string[]>>, id: string) => {
     setList(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
+  const toggleSingleInList = (setList: React.Dispatch<React.SetStateAction<string[]>>, id: string) => {
+    setList(prev => (prev.includes(id) ? [] : [id]));
   };
 
   const inputClass = "w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors";
@@ -93,7 +135,7 @@ const PersonForm: React.FC<PersonFormProps> = ({ person, onClose, onSave }) => {
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-border">
           <h2 className="font-display font-semibold text-lg text-foreground">
-            {person ? 'Editar Pessoa' : 'Nova Pessoa'}
+            {person ? `Editar ${data.firstName}` : 'Nova Pessoa'}
           </h2>
           <button onClick={onClose} className="p-2 rounded-lg hover:bg-muted transition-colors">
             <X className="h-5 w-5 text-muted-foreground" />
@@ -150,7 +192,7 @@ const PersonForm: React.FC<PersonFormProps> = ({ person, onClose, onSave }) => {
               <div>
                 <label className={labelClass}>Gênero</label>
                 <div className="flex gap-2">
-                  {(['male', 'female', 'other'] as Gender[]).map(g => (
+                  {(['male', 'female'] as Gender[]).map(g => (
                     <button
                       key={g}
                       onClick={() => set('gender', data.gender === g ? '' : g)}
@@ -160,7 +202,7 @@ const PersonForm: React.FC<PersonFormProps> = ({ person, onClose, onSave }) => {
                           : 'bg-background text-muted-foreground border-border hover:border-primary/50'
                       }`}
                     >
-                      {g === 'male' ? '♂ Masc.' : g === 'female' ? '♀ Fem.' : '⚧ Outro'}
+                      {g === 'male' ? '♂ Masc.' : '♀ Fem.'}
                     </button>
                   ))}
                 </div>
@@ -184,6 +226,24 @@ const PersonForm: React.FC<PersonFormProps> = ({ person, onClose, onSave }) => {
                   <label className={labelClass}>Título</label>
                   <input className={inputClass} placeholder="Dr., Prof., etc." value={data.title} onChange={e => set('title', e.target.value)} />
                 </div>
+              </div>
+              <div>
+                <label className={labelClass}>Tipo sanguíneo</label>
+                <select
+                  className={inputClass}
+                  value={data.bloodType}
+                  onChange={e => set('bloodType', e.target.value)}
+                >
+                  <option value="">Selecione...</option>
+                  <option value="A+">A+</option>
+                  <option value="A-">A-</option>
+                  <option value="B+">B+</option>
+                  <option value="B-">B-</option>
+                  <option value="AB+">AB+</option>
+                  <option value="AB-">AB-</option>
+                  <option value="O+">O+</option>
+                  <option value="O-">O-</option>
+                </select>
               </div>
               <div>
                 <label className={labelClass}>Foto (URL)</label>
@@ -264,7 +324,7 @@ const PersonForm: React.FC<PersonFormProps> = ({ person, onClose, onSave }) => {
                         >
                           <div className="h-8 w-8 rounded-full bg-green-light flex items-center justify-center flex-shrink-0">
                             {p.photoUrl ? (
-                              <img src={p.photoUrl} alt="" className="h-full w-full rounded-full object-cover" />
+                              <img src={p.photoUrl} alt="" className="h-full w-full rounded-full object-cover" referrerPolicy="no-referrer" />
                             ) : (
                               <User className="h-4 w-4 text-primary" />
                             )}
@@ -282,7 +342,7 @@ const PersonForm: React.FC<PersonFormProps> = ({ person, onClose, onSave }) => {
                       {otherPersons.map(p => (
                         <button
                           key={p.id}
-                          onClick={() => toggleInList(spouseIds, setSpouseIds, p.id)}
+                          onClick={() => toggleSingleInList(setSpouseIds, p.id)}
                           className={`w-full flex items-center gap-3 p-2.5 rounded-lg text-left text-sm transition-all border ${
                             spouseIds.includes(p.id)
                               ? 'bg-gold-light border-gold/30 text-foreground'
@@ -291,7 +351,7 @@ const PersonForm: React.FC<PersonFormProps> = ({ person, onClose, onSave }) => {
                         >
                           <div className="h-8 w-8 rounded-full bg-gold-light flex items-center justify-center flex-shrink-0">
                             {p.photoUrl ? (
-                              <img src={p.photoUrl} alt="" className="h-full w-full rounded-full object-cover" />
+                              <img src={p.photoUrl} alt="" className="h-full w-full rounded-full object-cover" referrerPolicy="no-referrer" />
                             ) : (
                               <User className="h-4 w-4 text-gold" />
                             )}

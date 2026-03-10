@@ -9,6 +9,7 @@ interface FamilyContextType extends FamilyState {
   addRelationship: (rel: Omit<Relationship, 'id'>) => void;
   removeRelationship: (id: string) => void;
   getRelationshipsForPerson: (personId: string) => Relationship[];
+  importState: (data: FamilyState) => void;
 }
 
 const FamilyContext = createContext<FamilyContextType | null>(null);
@@ -70,11 +71,19 @@ export const FamilyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     [state.relationships]
   );
 
+  const importState = useCallback((data: FamilyState) => {
+    setState({
+      persons: Array.isArray(data.persons) ? data.persons : [],
+      relationships: Array.isArray(data.relationships) ? data.relationships : [],
+    });
+  }, []);
+
   return (
     <FamilyContext.Provider value={{
       ...state,
       addPerson, updatePerson, deletePerson, getPerson,
       addRelationship, removeRelationship, getRelationshipsForPerson,
+      importState,
     }}>
       {children}
     </FamilyContext.Provider>

@@ -8,6 +8,12 @@ interface TreeNodeProps {
   onSelect: (person: Person) => void;
 }
 
+const getYearFromDate = (date: string): string => {
+  if (!date) return '';
+  const [year] = date.split('-');
+  return year || date;
+};
+
 const TreeNode: React.FC<TreeNodeProps> = ({ person, onSelect }) => {
   const { persons, relationships, getPerson } = useFamily();
   const children = getChildren(person.id, relationships)
@@ -33,7 +39,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({ person, onSelect }) => {
         >
           <div className="h-12 w-12 rounded-full bg-green-light flex items-center justify-center overflow-hidden">
             {person.photoUrl ? (
-              <img src={person.photoUrl} alt={person.firstName} className="h-full w-full object-cover" />
+              <img src={person.photoUrl} alt={person.firstName} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
             ) : (
               <User className="h-6 w-6 text-primary" />
             )}
@@ -44,8 +50,8 @@ const TreeNode: React.FC<TreeNodeProps> = ({ person, onSelect }) => {
             </p>
             {person.birthDate && (
               <p className="text-[10px] text-muted-foreground mt-0.5">
-                {new Date(person.birthDate).getFullYear()}
-                {person.deathDate && ` – ${new Date(person.deathDate).getFullYear()}`}
+                {getYearFromDate(person.birthDate)}
+                {person.deathDate && ` – ${getYearFromDate(person.deathDate)}`}
               </p>
             )}
           </div>
@@ -62,7 +68,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({ person, onSelect }) => {
             >
               <div className="h-12 w-12 rounded-full bg-green-light flex items-center justify-center overflow-hidden">
                 {spouse.photoUrl ? (
-                  <img src={spouse.photoUrl} alt={spouse.firstName} className="h-full w-full object-cover" />
+                  <img src={spouse.photoUrl} alt={spouse.firstName} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
                 ) : (
                   <User className="h-6 w-6 text-primary" />
                 )}
@@ -73,8 +79,8 @@ const TreeNode: React.FC<TreeNodeProps> = ({ person, onSelect }) => {
                 </p>
                 {spouse.birthDate && (
                   <p className="text-[10px] text-muted-foreground mt-0.5">
-                    {new Date(spouse.birthDate).getFullYear()}
-                    {spouse.deathDate && ` – ${new Date(spouse.deathDate).getFullYear()}`}
+                    {getYearFromDate(spouse.birthDate)}
+                    {spouse.deathDate && ` – ${getYearFromDate(spouse.deathDate)}`}
                   </p>
                 )}
               </div>

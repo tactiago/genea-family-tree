@@ -1,73 +1,71 @@
-# Welcome to your Lovable project
+# Genea
 
-## Project info
+Sua árvore genealógica, simples e gratuita. Crie e visualize a história da sua família em minutos — sem cadastro, sem complicação.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+**Live**: [arvore-genea.vercel.app](https://arvore-genea.vercel.app)
 
-## How can I edit this code?
+---
 
-There are several ways of editing your application.
+## Galeria
 
-**Use Lovable**
+### Landing page
+Boas-vindas quando a árvore está vazia — explica o que é o Genea e orienta a começar.
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+![Landing page do Genea](src/assets/landing-page.png)
 
-Changes made via Lovable will be committed automatically to this repo.
+### Árvore genealógica
+Visualização em árvore com pais, filhos e cônjuges conectados.
 
-**Use your preferred IDE**
+![Árvore genealógica da família Potter](src/assets/potter-family-tree.png)
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### Linha do tempo
+Eventos (nascimentos e falecimentos) ordenados cronologicamente.
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+![Linha do tempo da família](src/assets/potters-timeline.png)
 
-Follow these steps:
+### Detalhes e relações
+Card expandido para adicionar pais, filhos e cônjuge a uma pessoa.
+
+![Card de pessoa com relações](src/assets/person-relations.png)
+
+### Formulário de edição
+Dados básicos, contato, biografia e relações em abas.
+
+![Formulário de edição de pessoa](src/assets/person-edit.png)
+
+---
+
+## Recursos
+
+- **Árvore visual** — Veja sua família em formato de árvore, com layout automático
+- **Linha do tempo** — Ordene os membros por período de vida
+- **Lista** — Visualize todos os membros em cards
+- **Importar / exportar JSON** — Guarde os dados onde quiser e evite vendor lock-in
+- **Privacidade** — Tudo é processado no seu navegador; os dados ficam apenas no seu dispositivo
+- **PWA-ready** — Use no celular ou no computador; alterações são salvas automaticamente
+
+## Como rodar
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+npm install
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+A aplicação abre em `http://localhost:8080`.
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## Deploy
 
-**Use GitHub Codespaces**
+O build estático pode ser servido em qualquer host (Vercel, Netlify, etc.):
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+```sh
+npm run build
+```
 
-## What technologies are used for this project?
+Os arquivos ficam em `dist/`.
 
-This project is built with:
+## Tecnologias
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+- Vite, React, TypeScript
+- Tailwind CSS, shadcn/ui
+- React Flow (árvore), Recharts (gráficos)
+- Framer Motion (animações)

@@ -3,7 +3,16 @@ import { BaseEdge, type EdgeProps, getStraightPath } from '@xyflow/react';
 import { Heart } from 'lucide-react';
 
 const SpouseEdge: React.FC<EdgeProps> = (props) => {
-  const { sourceX, sourceY, targetX, targetY } = props;
+  const {
+    id,
+    sourceX,
+    sourceY,
+    targetX,
+    targetY,
+    markerStart,
+    markerEnd,
+    style,
+  } = props;
   const [edgePath] = getStraightPath({
     sourceX,
     sourceY,
@@ -16,7 +25,18 @@ const SpouseEdge: React.FC<EdgeProps> = (props) => {
 
   return (
     <>
-      <BaseEdge {...props} path={edgePath} style={{ stroke: 'hsl(var(--gold))', strokeWidth: 2, strokeDasharray: '6 3' }} />
+      <BaseEdge
+        id={id}
+        markerStart={markerStart}
+        markerEnd={markerEnd}
+        path={edgePath}
+        style={{
+          ...style,
+          stroke: 'hsl(var(--gold))',
+          strokeWidth: 2,
+          strokeDasharray: '6 3',
+        }}
+      />
       <foreignObject x={midX - 10} y={midY - 10} width={20} height={20} className="pointer-events-none">
         <div className="flex items-center justify-center w-5 h-5 rounded-full bg-card">
           <Heart className="h-3 w-3 text-gold" />

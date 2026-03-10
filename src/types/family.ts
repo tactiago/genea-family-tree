@@ -1,4 +1,4 @@
-export type Gender = 'male' | 'female' | 'other' | '';
+export type Gender = 'male' | 'female' | '';
 
 export type RelationshipType = 
   | 'parent' 
@@ -19,6 +19,7 @@ export interface Person {
   birthDate: string;
   deathDate: string;
   gender: Gender;
+  bloodType: string;
   photoUrl: string;
   // Contact
   email: string;
@@ -57,6 +58,7 @@ export const createEmptyPerson = (): Omit<Person, 'id' | 'createdAt'> => ({
   birthDate: '',
   deathDate: '',
   gender: '',
+  bloodType: '',
   photoUrl: '',
   email: '',
   phone: '',
