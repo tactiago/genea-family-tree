@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Plus, Upload, TreePine, Users, FileJson, Shield, Smartphone, Sparkles, TreeDeciduous, ArrowRight } from 'lucide-react';
-import geneaLogo from '@/assets/genea-logo.png';
+import geneaLogo from '@/assets/genea-logo.webp';
 
 interface EmptyStateLandingProps {
   onAddPerson: () => void;
@@ -50,6 +50,8 @@ const EmptyStateLanding: React.FC<EmptyStateLandingProps> = ({ onAddPerson, onIm
               src={geneaLogo}
               alt="Genea"
               className="h-60 w-60 drop-shadow-sm"
+              fetchPriority="high"
+              loading="eager"
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ delay: 0.2, duration: 0.4 }}

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { TreeDeciduous } from 'lucide-react';
-import geneaLogo from '@/assets/genea-logo.png';
+import geneaLogo from '@/assets/genea-logo.webp';
 
 interface LandingHeaderProps {
   hasSavedTree: boolean;

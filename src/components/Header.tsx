@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, Download, Upload, RotateCcw } from 'lucide-react';
-import geneaLogo from '@/assets/genea-logo.png';
+import geneaLogo from '@/assets/genea-logo.webp';
 
 interface HeaderProps {
   onAddPerson: () => void;
