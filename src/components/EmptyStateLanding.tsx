@@ -2,6 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Plus, Upload, TreePine, Users, FileJson, Shield, Smartphone, Sparkles, TreeDeciduous, ArrowRight } from 'lucide-react';
 import geneaLogo from '@/assets/genea-logo.webp';
+import posthog from '@/lib/posthog';
 
 interface EmptyStateLandingProps {
   onAddPerson: () => void;
@@ -29,6 +30,10 @@ const steps = [
 ];
 
 const EmptyStateLanding: React.FC<EmptyStateLandingProps> = ({ onAddPerson, onImport, onViewExample, onGoToTree }) => {
+  const trackCta = (cta: string) => {
+    posthog.capture('cta_clicked', { cta });
+  };
+
   return (
     <div className="min-h-[calc(100vh-4rem)] flex flex-col relative overflow-hidden">
       {/* Subtle decorative background */}
@@ -74,7 +79,7 @@ const EmptyStateLanding: React.FC<EmptyStateLandingProps> = ({ onAddPerson, onIm
           >
             {onGoToTree && (
               <button
-                onClick={onGoToTree}
+                onClick={() => { trackCta('go_to_tree'); onGoToTree(); }}
                 className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-xl bg-primary px-8 py-3.5 text-base font-semibold text-primary-foreground shadow-lg shadow-primary/25 hover:opacity-90 active:scale-[0.98] transition-all"
               >
                 <TreeDeciduous className="h-5 w-5" />
@@ -84,14 +89,14 @@ const EmptyStateLanding: React.FC<EmptyStateLandingProps> = ({ onAddPerson, onIm
             )}
             <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
               <button
-                onClick={onAddPerson}
+                onClick={() => { trackCta('add_first_person'); onAddPerson(); }}
                 className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-xl bg-primary px-8 py-3.5 text-base font-semibold text-primary-foreground shadow-lg shadow-primary/25 hover:opacity-90 active:scale-[0.98] transition-all"
               >
                 <Plus className="h-5 w-5" />
                 Começar — adicionar primeira pessoa
               </button>
               <button
-                onClick={onImport}
+                onClick={() => { trackCta('import_json'); onImport(); }}
                 className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-xl border-2 border-border px-6 py-3 text-sm font-medium text-foreground hover:bg-muted hover:border-primary/40 transition-all"
               >
                 <Upload className="h-4 w-4" />
@@ -99,7 +104,7 @@ const EmptyStateLanding: React.FC<EmptyStateLandingProps> = ({ onAddPerson, onIm
               </button>
             </div>
             <button
-              onClick={onViewExample}
+              onClick={() => { trackCta('view_example'); onViewExample(); }}
               className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors"
             >
               <Sparkles className="h-4 w-4" />
@@ -176,7 +181,7 @@ const EmptyStateLanding: React.FC<EmptyStateLandingProps> = ({ onAddPerson, onIm
           {onGoToTree && (
             <>
               <button
-                onClick={onGoToTree}
+                onClick={() => { trackCta('go_to_tree_bottom'); onGoToTree(); }}
                 className="flex items-center gap-2 text-primary font-medium hover:underline"
               >
                 <TreeDeciduous className="h-4 w-4" />
@@ -187,7 +192,7 @@ const EmptyStateLanding: React.FC<EmptyStateLandingProps> = ({ onAddPerson, onIm
             </>
           )}
           <button
-            onClick={onAddPerson}
+            onClick={() => { trackCta('add_person_bottom'); onAddPerson(); }}
             className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
           >
             <Plus className="h-4 w-4" />
@@ -195,7 +200,7 @@ const EmptyStateLanding: React.FC<EmptyStateLandingProps> = ({ onAddPerson, onIm
           </button>
           <span className="hidden sm:inline text-muted-foreground">·</span>
           <button
-            onClick={onImport}
+            onClick={() => { trackCta('import_json_bottom'); onImport(); }}
             className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
           >
             <FileJson className="h-4 w-4" />
@@ -203,7 +208,7 @@ const EmptyStateLanding: React.FC<EmptyStateLandingProps> = ({ onAddPerson, onIm
           </button>
           <span className="hidden sm:inline text-muted-foreground">·</span>
           <button
-            onClick={onViewExample}
+            onClick={() => { trackCta('view_example_bottom'); onViewExample(); }}
             className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
           >
             <Sparkles className="h-4 w-4" />

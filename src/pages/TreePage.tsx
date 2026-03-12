@@ -2,6 +2,7 @@ import React, { useState, useRef, ChangeEvent, useEffect, useCallback } from 're
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useFamily } from '@/contexts/FamilyContext';
 import { Person, getFullName, FamilyState } from '@/types/family';
+import posthog from '@/lib/posthog';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import EmptyStateLanding from '@/components/EmptyStateLanding';
@@ -63,8 +64,14 @@ const TreePage = () => {
         persons: importedPersons,
         relationships: importedRelationships,
       });
+
+      posthog.capture('example_tree_loaded', {
+        person_count: importedPersons.length,
+        relationship_count: importedRelationships.length,
+      });
     } catch (error) {
       console.error('Erro ao carregar exemplo:', error);
+      posthog.captureException(error);
       alert('Não foi possível carregar o exemplo. Tente novamente.');
     }
   }, [importState]);
@@ -120,6 +127,11 @@ const TreePage = () => {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+
+    posthog.capture('tree_exported', {
+      person_count: persons.length,
+      relationship_count: relationships.length,
+    });
   };
 
   const handleTriggerImport = () => {
@@ -147,9 +159,15 @@ const TreePage = () => {
         relationships: importedRelationships,
       });
 
+      posthog.capture('tree_imported', {
+        person_count: importedPersons.length,
+        relationship_count: importedRelationships.length,
+      });
+
       alert('Árvore genealógica importada com sucesso!');
     } catch (error) {
       console.error('Erro ao importar JSON da árvore:', error);
+      posthog.captureException(error);
       alert('Não foi possível importar o arquivo JSON. Verifique se o arquivo é válido.');
     } finally {
       event.target.value = '';
@@ -250,6 +268,12 @@ const TreePage = () => {
       });
     }
 
+    posthog.capture('relationship_added', {
+      relationship_kind: relationshipKind,
+      person_id: existingPersonId,
+      target_person_id: relationshipTarget.id,
+    });
+
     closeRelationshipChooser();
   };
 
@@ -257,6 +281,10 @@ const TreePage = () => {
     if (confirm('Tem certeza que deseja remover esta pessoa?')) {
       deletePerson(id);
       if (selectedPerson?.id === id) setSelectedPerson(undefined);
+      posthog.capture('person_deleted', {
+        person_id: id,
+        total_persons_remaining: persons.length - 1,
+      });
     }
   };
 
@@ -264,7 +292,16 @@ const TreePage = () => {
     setShowStartFreshDialog(true);
   };
 
+  const handleViewChange = (newView: View) => {
+    setView(newView);
+    posthog.capture('view_changed', { view: newView, previous_view: view });
+  };
+
   const handleConfirmStartFresh = () => {
+    posthog.capture('tree_reset', {
+      previous_person_count: persons.length,
+      previous_relationship_count: relationships.length,
+    });
     importState({ persons: [], relationships: [] });
     setSelectedPerson(undefined);
     setShowStartFreshDialog(false);
@@ -292,7 +329,7 @@ const TreePage = () => {
         <div className="container py-4 shrink-0">
           <div className="flex items-center gap-1 bg-muted p-1 rounded-lg w-full sm:w-fit">
             <button
-              onClick={() => setView('tree')}
+              onClick={() => handleViewChange('tree')}
               className={`flex items-center justify-center w-full h-full sm:w-fit gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
                 view === 'tree'
                   ? 'bg-card text-foreground card-shadow'
@@ -303,7 +340,7 @@ const TreePage = () => {
               Árvore
             </button>
             <button
-              onClick={() => setView('list')}
+              onClick={() => handleViewChange('list')}
               className={`flex items-center justify-center w-full h-full sm:w-fit gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
                 view === 'list'
                   ? 'bg-card text-foreground card-shadow'
@@ -314,7 +351,7 @@ const TreePage = () => {
               Lista
             </button>
             <button
-              onClick={() => setView('timeline')}
+              onClick={() => handleViewChange('timeline')}
               className={`flex items-center justify-center w-full h-full sm:w-fit gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
                 view === 'timeline'
                   ? 'bg-card text-foreground card-shadow'

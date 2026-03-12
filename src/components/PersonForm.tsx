@@ -3,6 +3,7 @@ import { createEmptyPerson, Person, Gender } from '@/types/family';
 import { useFamily } from '@/contexts/FamilyContext';
 import { X, User, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import posthog from '@/lib/posthog';
 
 interface PersonFormProps {
   person?: Person;
@@ -98,6 +99,25 @@ const PersonForm: React.FC<PersonFormProps> = ({
           type: 'spouse',
         });
       }
+    }
+
+    if (person) {
+      posthog.capture('person_updated', {
+        person_id: savedPerson.id,
+        has_birth_date: !!data.birthDate,
+        has_photo: !!data.photoUrl,
+        gender: data.gender || null,
+      });
+    } else {
+      posthog.capture('person_added', {
+        person_id: savedPerson.id,
+        has_birth_date: !!data.birthDate,
+        has_photo: !!data.photoUrl,
+        gender: data.gender || null,
+        linked_as_parent_of: linkAsParentOfId || null,
+        linked_as_child_of: linkAsChildOfId || null,
+        linked_as_spouse_of: linkAsSpouseOfId || null,
+      });
     }
 
     onSave();
