@@ -14,17 +14,17 @@ const steps = [
   {
     icon: Plus,
     title: 'Adicione as primeiras pessoas',
-    description: 'Comece por você ou por um ancestral. Nome, datas de nascimento e fotos.',
+    description: 'Comece por você ou por um ancestral da sua genealogia. Nome, datas de nascimento e fotos.',
   },
   {
     icon: Users,
     title: 'Conecte a família',
-    description: 'Vincule pais, filhos e cônjuges. A árvore cresce conforme você adiciona.',
+    description: 'Vincule pais, filhos e cônjuges. A árvore genealógica cresce conforme você adiciona.',
   },
   {
     icon: TreePine,
     title: 'Visualize e exporte',
-    description: 'Veja sua árvore, a linha do tempo e exporte em JSON para guardar ou compartilhar.',
+    description: 'Veja sua árvore genealógica, a linha do tempo e exporte em JSON para guardar ou compartilhar.',
   },
 ];
 
@@ -48,7 +48,7 @@ const EmptyStateLanding: React.FC<EmptyStateLandingProps> = ({ onAddPerson, onIm
           <div className="flex justify-center mb-2">
             <motion.img
               src={geneaLogo}
-              alt="Genea"
+              alt="Genea - Árvore genealógica e genealogia online"
               className="h-60 w-60 drop-shadow-sm"
               fetchPriority="high"
               loading="eager"
@@ -63,7 +63,7 @@ const EmptyStateLanding: React.FC<EmptyStateLandingProps> = ({ onAddPerson, onIm
             <span className="text-primary">simples e gratuita</span>
           </h1>
           <p className="text-lg text-muted-foreground max-w-xl mx-auto mb-10">
-            Crie e visualize a história da sua família em minutos. Sem cadastro, sem complicação.
+            Crie sua árvore genealógica e genealogia da família em minutos. Sem cadastro, sem complicação.
           </p>
 
           <motion.div
@@ -113,7 +113,7 @@ const EmptyStateLanding: React.FC<EmptyStateLandingProps> = ({ onAddPerson, onIm
       <section className="border-t border-border bg-card/50 py-12 px-4">
         <div className="container">
           <h2 className="font-display text-xl font-semibold text-foreground text-center mb-8">
-            Como funciona
+            Como criar sua árvore genealógica
           </h2>
           <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto">
             {steps.map((step, i) => (
@@ -147,7 +147,7 @@ const EmptyStateLanding: React.FC<EmptyStateLandingProps> = ({ onAddPerson, onIm
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">
-                  Seus dados ficam apenas no seu navegador. Tudo é processado localmente e você decide onde salvar — sem cadastro e sem dependência de serviço.
+                  Sua genealogia e dados da família ficam apenas no seu navegador. Tudo é processado localmente e você decide onde salvar — sem cadastro e sem dependência de serviço.
                 </p>
               </div>
             </div>
