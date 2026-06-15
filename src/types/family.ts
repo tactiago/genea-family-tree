@@ -20,6 +20,7 @@ export interface Person {
   deathDate: string;
   gender: Gender;
   bloodType: string;
+  documentNumber: string;
   photoUrl: string;
   // Contact
   email: string;
@@ -42,6 +43,8 @@ export interface Relationship {
   relatedPersonId: string;
   type: RelationshipType;
   label?: string; // for 'other' type
+  marriageDate?: string;
+  marriagePlace?: string;
 }
 
 export interface FamilyState {
@@ -59,6 +62,7 @@ export const createEmptyPerson = (): Omit<Person, 'id' | 'createdAt'> => ({
   deathDate: '',
   gender: '',
   bloodType: '',
+  documentNumber: '',
   photoUrl: '',
   email: '',
   phone: '',
@@ -97,6 +101,19 @@ export const getSpouses = (personId: string, relationships: Relationship[]): str
   return relationships
     .filter(r => r.type === 'spouse' && (r.personId === personId || r.relatedPersonId === personId))
     .map(r => r.personId === personId ? r.relatedPersonId : r.personId);
+};
+
+export const getSpouseRelationship = (
+  personId: string,
+  spouseId: string,
+  relationships: Relationship[],
+): Relationship | undefined => {
+  return relationships.find(
+    r =>
+      r.type === 'spouse' &&
+      ((r.personId === personId && r.relatedPersonId === spouseId) ||
+        (r.personId === spouseId && r.relatedPersonId === personId)),
+  );
 };
 
 export const getRootPersons = (persons: Person[], relationships: Relationship[]): Person[] => {

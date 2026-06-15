@@ -8,7 +8,7 @@ interface FamilyTimelineProps {
   onSelectPerson: (person: Person) => void;
 }
 
-type TimelineEventType = 'birth' | 'death' | 'created';
+type TimelineEventType = 'birth' | 'death' | 'marriage' | 'created';
 
 interface TimelineEvent {
   id: string;
@@ -45,10 +45,11 @@ const formatDateLabel = (raw: string): string => {
 };
 
 const FamilyTimeline: React.FC<FamilyTimelineProps> = ({ onSelectPerson }) => {
-  const { persons } = useFamily();
+  const { persons, relationships, getPerson } = useFamily();
 
   const events = useMemo<TimelineEvent[]>(() => {
     const result: TimelineEvent[] = [];
+    const seenMarriages = new Set<string>();
 
     persons.forEach((person) => {
       if (person.birthDate) {
@@ -76,18 +77,39 @@ const FamilyTimeline: React.FC<FamilyTimelineProps> = ({ onSelectPerson }) => {
           sortKey: parseDateToSortKey(person.deathDate),
         });
       }
-
-      // Se não houver data de nascimento nem de falecimento, não incluímos na linha do tempo
     });
+
+    relationships
+      .filter(r => r.type === 'spouse' && r.marriageDate)
+      .forEach(r => {
+        const pairKey = [r.personId, r.relatedPersonId].sort().join(':');
+        if (seenMarriages.has(pairKey)) return;
+        seenMarriages.add(pairKey);
+
+        const spouseA = getPerson(r.personId);
+        const spouseB = getPerson(r.relatedPersonId);
+        if (!spouseA || !spouseB) return;
+
+        result.push({
+          id: `${pairKey}-marriage`,
+          person: spouseA,
+          type: 'marriage',
+          dateLabel: formatDateLabel(r.marriageDate!),
+          description: `Casamento de ${getFullName(spouseA)} e ${getFullName(spouseB)}`,
+          location: r.marriagePlace || undefined,
+          accentColor: 'from-amber-400/90 to-amber-500/70',
+          sortKey: parseDateToSortKey(r.marriageDate!),
+        });
+      });
 
     return result
       .filter((e) => Number.isFinite(e.sortKey))
       .sort((a, b) => a.sortKey - b.sortKey);
-  }, [persons]);
+  }, [persons, relationships, getPerson]);
 
   if (events.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-[calc(100vh-220px)] min-h-[420px] rounded-xl border border-border bg-card/70 px-6">
+      <div className="flex flex-col items-center justify-center h-full min-h-0 rounded-xl border border-border bg-card/70 px-6">
         <div className="relative mb-6">
           <div className="h-20 w-20 rounded-full bg-muted flex items-center justify-center shadow-inner" />
           <Clock className="h-9 w-9 text-primary absolute inset-0 m-auto" />
@@ -104,7 +126,7 @@ const FamilyTimeline: React.FC<FamilyTimelineProps> = ({ onSelectPerson }) => {
   }
 
   return (
-    <div className="w-full h-[calc(100vh-220px)] min-h-[420px] rounded-xl border border-border bg-gradient-to-b from-background via-background/90 to-background overflow-hidden">
+    <div className="w-full h-full min-h-0 rounded-xl border border-border bg-gradient-to-b from-background via-background/90 to-background overflow-hidden">
       <div className="h-full overflow-y-auto px-3 sm:px-6 py-8">
         <div className="mx-auto max-w-4xl">
           {/* Header da timeline */}
@@ -160,7 +182,9 @@ const FamilyTimeline: React.FC<FamilyTimelineProps> = ({ onSelectPerson }) => {
                           className={`absolute inset-0 rounded-2xl bg-gradient-to-r ${
                             event.type === 'death'
                               ? 'from-rose-500/6 via-transparent to-transparent'
-                              : 'from-emerald-500/6 via-transparent to-transparent'
+                              : event.type === 'marriage'
+                                ? 'from-amber-500/6 via-transparent to-transparent'
+                                : 'from-emerald-500/6 via-transparent to-transparent'
                           } opacity-0 group-hover:opacity-100 transition-opacity duration-200`}
                         />
 

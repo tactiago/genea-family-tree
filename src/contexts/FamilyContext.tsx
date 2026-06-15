@@ -7,6 +7,7 @@ interface FamilyContextType extends FamilyState {
   deletePerson: (id: string) => void;
   getPerson: (id: string) => Person | undefined;
   addRelationship: (rel: Omit<Relationship, 'id'>) => void;
+  updateRelationship: (id: string, updates: Partial<Omit<Relationship, 'id'>>) => void;
   removeRelationship: (id: string) => void;
   getRelationshipsForPerson: (personId: string) => Relationship[];
   importState: (data: FamilyState) => void;
@@ -62,6 +63,13 @@ export const FamilyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setState(s => ({ ...s, relationships: [...s.relationships, relationship] }));
   }, []);
 
+  const updateRelationship = useCallback((id: string, updates: Partial<Omit<Relationship, 'id'>>) => {
+    setState(s => ({
+      ...s,
+      relationships: s.relationships.map(r => (r.id === id ? { ...r, ...updates } : r)),
+    }));
+  }, []);
+
   const removeRelationship = useCallback((id: string) => {
     setState(s => ({ ...s, relationships: s.relationships.filter(r => r.id !== id) }));
   }, []);
@@ -82,7 +90,7 @@ export const FamilyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     <FamilyContext.Provider value={{
       ...state,
       addPerson, updatePerson, deletePerson, getPerson,
-      addRelationship, removeRelationship, getRelationshipsForPerson,
+      addRelationship, updateRelationship, removeRelationship, getRelationshipsForPerson,
       importState,
     }}>
       {children}

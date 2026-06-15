@@ -1,17 +1,19 @@
 import React, { useState, useRef, ChangeEvent, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useFamily } from '@/contexts/FamilyContext';
-import { Person, getFullName, FamilyState } from '@/types/family';
+import { Person, getFullName, FamilyState, Gender } from '@/types/family';
 import posthog from '@/lib/posthog';
-import Header from '@/components/Header';
-import Footer from '@/components/Footer';
 import EmptyStateLanding from '@/components/EmptyStateLanding';
+import TreeSidebar from '@/components/TreeSidebar';
+import { type TreeView } from '@/components/TreeViewTabs';
 import FamilyTree from '@/components/FamilyTree';
+import FamilyTreeV2 from '@/components/family-tree-v2/FamilyTreeV2';
 import PersonCard from '@/components/PersonCard';
 import PersonForm from '@/components/PersonForm';
 import FamilyTimeline from '@/components/FamilyTimeline';
 import { AnimatePresence, motion } from 'framer-motion';
-import { LayoutGrid, Clock, TreePine } from 'lucide-react';
+import { Menu, Plus } from 'lucide-react';
+import { Sheet, SheetContent } from '@/components/ui/sheet';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,8 +25,6 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 
-type View = 'tree' | 'list' | 'timeline';
-
 type RelationshipKind = 'father' | 'mother' | 'child' | 'spouse';
 
 type LocationState = { action?: 'add' | 'import' | 'example' };
@@ -35,7 +35,10 @@ const TreePage = () => {
   const { persons, relationships, deletePerson, addRelationship, importState } = useFamily();
   const [showForm, setShowForm] = useState(false);
   const [editPerson, setEditPerson] = useState<Person | undefined>();
-  const [view, setView] = useState<View>('tree');
+  const [formInitialTab, setFormInitialTab] = useState<'basic' | 'relations' | undefined>();
+  const [formInitialGender, setFormInitialGender] = useState<Gender | undefined>();
+  const [view, setView] = useState<TreeView>('tree');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [selectedPerson, setSelectedPerson] = useState<Person | undefined>();
   const [linkAsParentOfId, setLinkAsParentOfId] = useState<string | undefined>();
   const [linkAsChildOfId, setLinkAsChildOfId] = useState<string | undefined>();
@@ -43,6 +46,8 @@ const TreePage = () => {
   const [relationshipKind, setRelationshipKind] = useState<RelationshipKind | null>(null);
   const [relationshipTarget, setRelationshipTarget] = useState<Person | undefined>();
   const [existingPersonId, setExistingPersonId] = useState<string | undefined>();
+  const [marriageDate, setMarriageDate] = useState('');
+  const [marriagePlace, setMarriagePlace] = useState('');
   const [showStartFreshDialog, setShowStartFreshDialog] = useState(false);
   const [showViewExampleDialog, setShowViewExampleDialog] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -176,14 +181,21 @@ const TreePage = () => {
 
   const handleAddPerson = () => {
     setEditPerson(undefined);
+    setFormInitialTab(undefined);
+    setFormInitialGender(undefined);
     setLinkAsParentOfId(undefined);
     setLinkAsChildOfId(undefined);
     setLinkAsSpouseOfId(undefined);
     setShowForm(true);
   };
 
-  const handleEditPerson = (person: Person) => {
+  const handleEditPerson = (person: Person, options?: { tab?: 'basic' | 'relations' }) => {
     setEditPerson(person);
+    const hasSpouse = relationships.some(
+      r => r.type === 'spouse' && (r.personId === person.id || r.relatedPersonId === person.id),
+    );
+    setFormInitialTab(options?.tab ?? (hasSpouse ? 'relations' : undefined));
+    setFormInitialGender(undefined);
     setLinkAsParentOfId(undefined);
     setLinkAsChildOfId(undefined);
     setLinkAsSpouseOfId(undefined);
@@ -191,7 +203,7 @@ const TreePage = () => {
   };
 
   const handleSelectPerson = (person: Person) => {
-    setSelectedPerson(person);
+    setSelectedPerson(persons.find(p => p.id === person.id) ?? person);
   };
 
   const handleAddFather = (child: Person) => {
@@ -216,12 +228,16 @@ const TreePage = () => {
     setRelationshipKind('spouse');
     setRelationshipTarget(person);
     setExistingPersonId(undefined);
+    setMarriageDate('');
+    setMarriagePlace('');
   };
 
   const closeRelationshipChooser = () => {
     setRelationshipKind(null);
     setRelationshipTarget(undefined);
     setExistingPersonId(undefined);
+    setMarriageDate('');
+    setMarriagePlace('');
   };
 
   const handleCreateNewFromRelationship = () => {
@@ -242,6 +258,10 @@ const TreePage = () => {
     }
 
     closeRelationshipChooser();
+    setFormInitialTab(relationshipKind === 'spouse' ? 'relations' : undefined);
+    setFormInitialGender(
+      relationshipKind === 'father' ? 'male' : relationshipKind === 'mother' ? 'female' : undefined,
+    );
     setShowForm(true);
   };
 
@@ -265,6 +285,8 @@ const TreePage = () => {
         personId: existingPersonId,
         relatedPersonId: relationshipTarget.id,
         type: 'spouse',
+        ...(marriageDate ? { marriageDate } : {}),
+        ...(marriagePlace ? { marriagePlace } : {}),
       });
     }
 
@@ -292,10 +314,12 @@ const TreePage = () => {
     setShowStartFreshDialog(true);
   };
 
-  const handleViewChange = (newView: View) => {
+  const handleViewChange = (newView: TreeView) => {
     setView(newView);
     posthog.capture('view_changed', { view: newView, previous_view: view });
   };
+
+  const isFullHeightView = view === 'tree' || view === 'treeV2' || view === 'timeline';
 
   const handleConfirmStartFresh = () => {
     posthog.capture('tree_reset', {
@@ -307,15 +331,18 @@ const TreePage = () => {
     setShowStartFreshDialog(false);
   };
 
+  const sidebarProps = {
+    personCount: persons.length,
+    view,
+    onViewChange: handleViewChange,
+    onAddPerson: handleAddPerson,
+    onExport: handleExportJson,
+    onImport: handleTriggerImport,
+    onStartFresh: handleStartFresh,
+  };
+
   return (
-    <div className="h-screen bg-background flex flex-col overflow-hidden">
-      <Header
-        onAddPerson={handleAddPerson}
-        personCount={persons.length}
-        onExport={handleExportJson}
-        onImport={handleTriggerImport}
-        onStartFresh={handleStartFresh}
-      />
+    <div className="h-screen bg-background flex overflow-hidden">
       <input
         ref={fileInputRef}
         type="file"
@@ -324,79 +351,81 @@ const TreePage = () => {
         onChange={handleImportJson}
       />
 
-      {/* View toggle - fixo entre header e conteúdo */}
-      {persons.length > 0 && (
-        <div className="container py-4 shrink-0">
-          <div className="flex items-center gap-1 bg-muted p-1 rounded-lg w-full sm:w-fit">
-            <button
-              onClick={() => handleViewChange('tree')}
-              className={`flex items-center justify-center w-full h-full sm:w-fit gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-                view === 'tree'
-                  ? 'bg-card text-foreground card-shadow'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              <TreePine className="h-4 w-4" />
-              Árvore
-            </button>
-            <button
-              onClick={() => handleViewChange('list')}
-              className={`flex items-center justify-center w-full h-full sm:w-fit gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-                view === 'list'
-                  ? 'bg-card text-foreground card-shadow'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              <LayoutGrid className="h-4 w-4" />
-              Lista
-            </button>
-            <button
-              onClick={() => handleViewChange('timeline')}
-              className={`flex items-center justify-center w-full h-full sm:w-fit gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-                view === 'timeline'
-                  ? 'bg-card text-foreground card-shadow'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              <Clock className="h-4 w-4" />
-              Linha do tempo
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Sidebar — desktop */}
+      <aside className="hidden md:flex w-64 shrink-0 border-r border-border h-full">
+        <TreeSidebar {...sidebarProps} className="w-full" />
+      </aside>
 
-      {/* Área rolável - apenas o conteúdo (tree/list/timeline), tabs ficam visíveis */}
-      <div className="flex-1 min-h-0 overflow-y-auto pb-14 sm:pb-20">
-      {/* Content */}
-      <main className={`${persons.length === 0 ? '' : 'container'}`}>
-        {persons.length === 0 ? (
-          <EmptyStateLanding
-            onAddPerson={handleAddPerson}
-            onImport={handleTriggerImport}
-            onViewExample={handleViewExample}
+      {/* Sidebar — mobile (sheet) */}
+      <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+        <SheetContent side="left" className="w-72 p-0 flex flex-col">
+          <TreeSidebar
+            {...sidebarProps}
+            onViewSelect={() => setMobileMenuOpen(false)}
+            className="h-full"
           />
-        ) : (
-          <>
-            {view === 'tree' && <FamilyTree onSelectPerson={handleSelectPerson} />}
-            {view === 'list' && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 py-4">
-                {persons.map(person => (
-                  <PersonCard
-                    key={person.id}
-                    person={person}
-                    onEdit={handleEditPerson}
-                    onDelete={handleDelete}
-                  />
-                ))}
-              </div>
-            )}
-            {view === 'timeline' && <FamilyTimeline onSelectPerson={handleSelectPerson} />}
-          </>
-        )}
-      </main>
-      </div>
+        </SheetContent>
+      </Sheet>
 
-      <Footer />
+      {/* Área principal — árvore em altura total */}
+      <div className="flex-1 min-w-0 flex flex-col min-h-0">
+        {/* Barra mínima no mobile */}
+        <div className="md:hidden shrink-0 flex h-12 items-center justify-between px-3 border-b border-border bg-card">
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen(true)}
+            className="flex h-9 w-9 items-center justify-center rounded-lg hover:bg-muted transition-colors"
+            aria-label="Abrir menu"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+          <span className="font-display font-semibold text-sm">Genea</span>
+          <button
+            type="button"
+            onClick={handleAddPerson}
+            className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
+            aria-label="Adicionar pessoa"
+          >
+            <Plus className="h-5 w-5" />
+          </button>
+        </div>
+
+        <main
+          className={`flex-1 min-h-0 ${
+            persons.length === 0
+              ? 'overflow-y-auto'
+              : isFullHeightView
+                ? 'overflow-hidden p-2 md:p-3'
+                : 'overflow-y-auto p-4 md:p-6'
+          }`}
+        >
+          {persons.length === 0 ? (
+            <EmptyStateLanding
+              onAddPerson={handleAddPerson}
+              onImport={handleTriggerImport}
+              onViewExample={handleViewExample}
+            />
+          ) : (
+            <>
+              {view === 'tree' && <FamilyTree onSelectPerson={handleSelectPerson} />}
+              {view === 'treeV2' && <FamilyTreeV2 onSelectPerson={handleSelectPerson} />}
+              {view === 'list' && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 max-w-6xl mx-auto">
+                  {persons.map(person => (
+                    <PersonCard
+                      key={person.id}
+                      person={person}
+                      onEdit={handleEditPerson}
+                      onDelete={handleDelete}
+                    />
+                  ))}
+                </div>
+              )}
+              {view === 'timeline' && <FamilyTimeline onSelectPerson={handleSelectPerson} />}
+            </>
+          )}
+        </main>
+      </div>
 
       {/* Selected person detail drawer */}
       <AnimatePresence>
@@ -417,8 +446,10 @@ const TreePage = () => {
               className="w-full sm:max-w-md max-h-[80vh] overflow-y-auto"
             >
               <PersonCard
+                key={selectedPerson.id}
                 person={selectedPerson}
                 showDetails
+                onSelectPerson={handleSelectPerson}
                 onEdit={(p) => { setSelectedPerson(undefined); handleEditPerson(p); }}
                 onDelete={(id) => { setSelectedPerson(undefined); handleDelete(id); }}
                 onAddFather={handleAddFather}
@@ -464,6 +495,31 @@ const TreePage = () => {
               </div>
 
               <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                {relationshipKind === 'spouse' && (
+                  <div className="rounded-lg border border-gold/30 bg-gold-light/30 p-3 space-y-3">
+                    <p className="text-xs font-semibold text-foreground">Dados do casamento (opcional)</p>
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1.5">Data do casamento</label>
+                      <input
+                        type="date"
+                        className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
+                        value={marriageDate}
+                        onChange={e => setMarriageDate(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1.5">Local do casamento</label>
+                      <input
+                        type="text"
+                        className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
+                        placeholder="Ex: Lisboa, Portugal"
+                        value={marriagePlace}
+                        onChange={e => setMarriagePlace(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                )}
+
                 {(() => {
                   const targetId = relationshipTarget.id;
 
@@ -588,15 +644,22 @@ const TreePage = () => {
       <AnimatePresence>
         {showForm && (
           <PersonForm
+            key={editPerson?.id ?? `new-${linkAsParentOfId ?? linkAsChildOfId ?? linkAsSpouseOfId ?? 'person'}-${formInitialGender ?? ''}`}
             person={editPerson}
+            initialTab={formInitialTab}
+            initialGender={formInitialGender}
             onClose={() => {
               setShowForm(false);
+              setFormInitialTab(undefined);
+              setFormInitialGender(undefined);
               setLinkAsParentOfId(undefined);
               setLinkAsChildOfId(undefined);
               setLinkAsSpouseOfId(undefined);
             }}
             onSave={() => {
               setShowForm(false);
+              setFormInitialTab(undefined);
+              setFormInitialGender(undefined);
               setLinkAsParentOfId(undefined);
               setLinkAsChildOfId(undefined);
               setLinkAsSpouseOfId(undefined);

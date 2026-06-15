@@ -12,7 +12,12 @@ import qrcodePix from '@/assets/qrcode-cnpj-pix.png';
 const SUGGESTED_AMOUNTS = [5, 10, 20, 50, 100];
 const PIX_CNPJ_RAW = '58669291000195';
 
-const Footer = () => {
+interface FooterProps {
+  variant?: 'default' | 'sidebar';
+  className?: string;
+}
+
+const Footer: React.FC<FooterProps> = ({ variant = 'default', className = '' }) => {
   const [showDonationModal, setShowDonationModal] = useState(false);
   const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
   const [copiedFeedback, setCopiedFeedback] = useState(false);
@@ -35,32 +40,55 @@ const Footer = () => {
     }
   };
 
+  const isSidebar = variant === 'sidebar';
+
   return (
     <>
-      <footer className="fixed bottom-0 left-0 right-0 z-10 border-t border-border bg-card/80 backdrop-blur-md py-2 sm:py-3">
-        <div className="container flex items-center justify-between gap-2 sm:gap-3">
-          <div className="flex items-center gap-2 min-w-0">
-            <p className="hidden sm:block text-xs text-muted-foreground truncate">
+      <footer
+        className={
+          isSidebar
+            ? `shrink-0 border-t border-border p-4 space-y-3 ${className}`
+            : `fixed bottom-0 left-0 right-0 z-10 border-t border-border bg-card/80 backdrop-blur-md py-2 sm:py-3 ${className}`
+        }
+      >
+        <div className={isSidebar ? 'space-y-3' : 'container flex items-center justify-between gap-2 sm:gap-3'}>
+          <div className={isSidebar ? 'space-y-2' : 'flex items-center gap-2 min-w-0'}>
+            <p className={`text-xs text-muted-foreground ${isSidebar ? '' : 'hidden sm:block truncate'}`}>
               Genea — preserve a história da sua família
             </p>
-            <p className="sm:hidden text-[11px] text-muted-foreground truncate">Genea</p>
+            {!isSidebar && (
+              <p className="sm:hidden text-[11px] text-muted-foreground truncate">Genea</p>
+            )}
             <a
               href="https://github.com/tactiago/genea-family-tree"
               target="_blank"
               rel="noopener noreferrer"
-              className="shrink-0 text-muted-foreground/70 hover:text-muted-foreground transition-colors p-1"
+              className={`text-muted-foreground/70 hover:text-muted-foreground transition-colors ${
+                isSidebar ? 'inline-flex items-center gap-1.5 text-xs' : 'shrink-0 p-1'
+              }`}
               aria-label="Código fonte no GitHub"
             >
-              <Github className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <Github className={isSidebar ? 'h-4 w-4' : 'h-3.5 w-3.5 sm:h-4 sm:w-4'} />
+              {isSidebar && <span>GitHub</span>}
             </a>
           </div>
           <button
             onClick={() => setShowDonationModal(true)}
-            className="flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-primary border border-primary/40 hover:bg-primary/5 transition-colors sm:gap-2 sm:rounded-lg sm:px-4 sm:py-2 sm:text-sm"
+            className={
+              isSidebar
+                ? 'flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-primary border border-primary/40 hover:bg-primary/5 transition-colors'
+                : 'flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-primary border border-primary/40 hover:bg-primary/5 transition-colors sm:gap-2 sm:rounded-lg sm:px-4 sm:py-2 sm:text-sm'
+            }
           >
-            <Heart className="h-3.5 w-3.5 fill-primary sm:h-4 sm:w-4" />
-            <span className="hidden sm:inline">Apoiar com doação</span>
-            <span className="sm:hidden">Apoiar</span>
+            <Heart className={`fill-primary ${isSidebar ? 'h-4 w-4' : 'h-3.5 w-3.5 sm:h-4 sm:w-4'}`} />
+            {isSidebar ? (
+              <span>Apoiar com doação</span>
+            ) : (
+              <>
+                <span className="hidden sm:inline">Apoiar com doação</span>
+                <span className="sm:hidden">Apoiar</span>
+              </>
+            )}
           </button>
         </div>
       </footer>

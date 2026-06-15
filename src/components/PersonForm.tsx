@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { createEmptyPerson, Person, Gender } from '@/types/family';
+import { createEmptyPerson, Person, Gender, Relationship } from '@/types/family';
 import { useFamily } from '@/contexts/FamilyContext';
 import { X, User, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -12,6 +12,8 @@ interface PersonFormProps {
   linkAsParentOfId?: string;
   linkAsChildOfId?: string;
   linkAsSpouseOfId?: string;
+  initialTab?: Tab;
+  initialGender?: Gender;
 }
 
 type Tab = 'basic' | 'contact' | 'bio' | 'relations';
@@ -23,6 +25,18 @@ const tabs: { id: Tab; label: string }[] = [
   { id: 'relations', label: 'Relações' },
 ];
 
+const getInitialSpouseIds = (
+  person: Person | undefined,
+  linkAsSpouseOfId: string | undefined,
+  relationships: Relationship[],
+): string[] => {
+  if (linkAsSpouseOfId) return [linkAsSpouseOfId];
+  if (!person) return [];
+  return relationships
+    .filter(r => r.type === 'spouse' && (r.personId === person.id || r.relatedPersonId === person.id))
+    .map(r => (r.personId === person.id ? r.relatedPersonId : r.personId));
+};
+
 const PersonForm: React.FC<PersonFormProps> = ({
   person,
   onClose,
@@ -30,21 +44,51 @@ const PersonForm: React.FC<PersonFormProps> = ({
   linkAsParentOfId,
   linkAsChildOfId,
   linkAsSpouseOfId,
+  initialTab,
+  initialGender,
 }) => {
   const { addPerson, updatePerson, persons, addRelationship, relationships, removeRelationship } = useFamily();
-  const [tab, setTab] = useState<Tab>('basic');
-  const [data, setData] = useState(person ? { ...person } : { ...createEmptyPerson() } as any);
+
+  const hasSpouseContext =
+    Boolean(linkAsSpouseOfId) ||
+    Boolean(
+      person &&
+        relationships.some(
+          r => r.type === 'spouse' && (r.personId === person.id || r.relatedPersonId === person.id),
+        ),
+    );
+
+  const [tab, setTab] = useState<Tab>(initialTab ?? (hasSpouseContext ? 'relations' : 'basic'));
+  const [data, setData] = useState(() => {
+    if (person) return { ...person };
+    return { ...createEmptyPerson(), ...(initialGender ? { gender: initialGender } : {}) };
+  });
   const [parentIds, setParentIds] = useState<string[]>(() => {
     if (!person) return [];
     return relationships
       .filter(r => r.type === 'parent' && r.personId === person.id)
       .map(r => r.relatedPersonId);
   });
-  const [spouseIds, setSpouseIds] = useState<string[]>(() => {
-    if (!person) return [];
-    return relationships
-      .filter(r => r.type === 'spouse' && (r.personId === person.id || r.relatedPersonId === person.id))
-      .map(r => r.personId === person.id ? r.relatedPersonId : r.personId);
+  const [spouseIds, setSpouseIds] = useState<string[]>(() =>
+    getInitialSpouseIds(person, linkAsSpouseOfId, relationships),
+  );
+  const [spouseDetails, setSpouseDetails] = useState<Record<string, { marriageDate: string; marriagePlace: string }>>(() => {
+    const details: Record<string, { marriageDate: string; marriagePlace: string }> = {};
+    if (person) {
+      relationships
+        .filter(r => r.type === 'spouse' && (r.personId === person.id || r.relatedPersonId === person.id))
+        .forEach(r => {
+          const spouseId = r.personId === person.id ? r.relatedPersonId : r.personId;
+          details[spouseId] = {
+            marriageDate: r.marriageDate || '',
+            marriagePlace: r.marriagePlace || '',
+          };
+        });
+    }
+    if (linkAsSpouseOfId && !details[linkAsSpouseOfId]) {
+      details[linkAsSpouseOfId] = { marriageDate: '', marriagePlace: '' };
+    }
+    return details;
   });
 
   const set = (key: string, value: any) => setData((d: any) => ({ ...d, [key]: value }));
@@ -70,7 +114,14 @@ const PersonForm: React.FC<PersonFormProps> = ({
       addRelationship({ personId: savedPerson.id, relatedPersonId: pid, type: 'parent' });
     });
     spouseIds.forEach(sid => {
-      addRelationship({ personId: savedPerson.id, relatedPersonId: sid, type: 'spouse' });
+      const details = spouseDetails[sid];
+      addRelationship({
+        personId: savedPerson.id,
+        relatedPersonId: sid,
+        type: 'spouse',
+        ...(details?.marriageDate ? { marriageDate: details.marriageDate } : {}),
+        ...(details?.marriagePlace ? { marriagePlace: details.marriagePlace } : {}),
+      });
     });
 
     // Linkagem rápida quando o formulário é aberto a partir dos atalhos
@@ -92,11 +143,14 @@ const PersonForm: React.FC<PersonFormProps> = ({
           type: 'parent',
         });
       }
-      if (linkAsSpouseOfId) {
+      if (linkAsSpouseOfId && !spouseIds.includes(linkAsSpouseOfId)) {
+        const details = spouseDetails[linkAsSpouseOfId];
         addRelationship({
           personId: savedPerson.id,
           relatedPersonId: linkAsSpouseOfId,
           type: 'spouse',
+          ...(details?.marriageDate ? { marriageDate: details.marriageDate } : {}),
+          ...(details?.marriagePlace ? { marriagePlace: details.marriagePlace } : {}),
         });
       }
     }
@@ -130,11 +184,62 @@ const PersonForm: React.FC<PersonFormProps> = ({
   };
 
   const toggleSingleInList = (setList: React.Dispatch<React.SetStateAction<string[]>>, id: string) => {
-    setList(prev => (prev.includes(id) ? [] : [id]));
+    setList(prev => {
+      if (prev.includes(id)) {
+        setSpouseDetails(d => {
+          const next = { ...d };
+          delete next[id];
+          return next;
+        });
+        return [];
+      }
+      setSpouseDetails(d => ({ ...d, [id]: d[id] || { marriageDate: '', marriagePlace: '' } }));
+      return [id];
+    });
+  };
+
+  const setSpouseDetail = (spouseId: string, field: 'marriageDate' | 'marriagePlace', value: string) => {
+    setSpouseDetails(prev => ({
+      ...prev,
+      [spouseId]: { ...(prev[spouseId] || { marriageDate: '', marriagePlace: '' }), [field]: value },
+    }));
   };
 
   const inputClass = "w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors";
   const labelClass = "block text-sm font-medium text-foreground mb-1.5";
+
+  const renderMarriageFields = () =>
+    spouseIds.map(sid => {
+      const spouse = persons.find(p => p.id === sid);
+      if (!spouse) return null;
+      const details = spouseDetails[sid] || { marriageDate: '', marriagePlace: '' };
+      return (
+        <div key={sid} className="rounded-lg border border-gold/30 bg-gold-light/30 p-3 space-y-3">
+          <p className="text-xs font-semibold text-foreground">
+            Casamento com {spouse.firstName} {spouse.currentLastNames || spouse.birthLastNames}
+          </p>
+          <div>
+            <label className={labelClass}>Data do casamento</label>
+            <input
+              type="date"
+              className={inputClass}
+              value={details.marriageDate}
+              onChange={e => setSpouseDetail(sid, 'marriageDate', e.target.value)}
+            />
+          </div>
+          <div>
+            <label className={labelClass}>Local do casamento</label>
+            <input
+              type="text"
+              className={inputClass}
+              placeholder="Ex: Lisboa, Portugal"
+              value={details.marriagePlace}
+              onChange={e => setSpouseDetail(sid, 'marriagePlace', e.target.value)}
+            />
+          </div>
+        </div>
+      );
+    });
 
   return (
     <motion.div
@@ -247,23 +352,34 @@ const PersonForm: React.FC<PersonFormProps> = ({
                   <input className={inputClass} placeholder="Dr., Prof., etc." value={data.title} onChange={e => set('title', e.target.value)} />
                 </div>
               </div>
-              <div>
-                <label className={labelClass}>Tipo sanguíneo</label>
-                <select
-                  className={inputClass}
-                  value={data.bloodType}
-                  onChange={e => set('bloodType', e.target.value)}
-                >
-                  <option value="">Selecione...</option>
-                  <option value="A+">A+</option>
-                  <option value="A-">A-</option>
-                  <option value="B+">B+</option>
-                  <option value="B-">B-</option>
-                  <option value="AB+">AB+</option>
-                  <option value="AB-">AB-</option>
-                  <option value="O+">O+</option>
-                  <option value="O-">O-</option>
-                </select>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelClass}>Tipo sanguíneo</label>
+                  <select
+                    className={inputClass}
+                    value={data.bloodType}
+                    onChange={e => set('bloodType', e.target.value)}
+                  >
+                    <option value="">Selecione...</option>
+                    <option value="A+">A+</option>
+                    <option value="A-">A-</option>
+                    <option value="B+">B+</option>
+                    <option value="B-">B-</option>
+                    <option value="AB+">AB+</option>
+                    <option value="AB-">AB-</option>
+                    <option value="O+">O+</option>
+                    <option value="O-">O-</option>
+                  </select>
+                </div>
+                <div>
+                  <label className={labelClass}>Número de documento</label>
+                  <input
+                    className={inputClass}
+                    placeholder="CPF, RG, outros"
+                    value={data.documentNumber}
+                    onChange={e => set('documentNumber', e.target.value)}
+                  />
+                </div>
               </div>
               <div>
                 <label className={labelClass}>Foto (URL)</label>
@@ -322,13 +438,22 @@ const PersonForm: React.FC<PersonFormProps> = ({
 
           {tab === 'relations' && (
             <>
-              {otherPersons.length === 0 ? (
+              {otherPersons.length === 0 && spouseIds.length === 0 ? (
                 <div className="text-center py-8">
                   <User className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
                   <p className="text-sm text-muted-foreground">Adicione mais pessoas para criar relações.</p>
                 </div>
               ) : (
                 <>
+                  {spouseIds.length > 0 && (
+                    <div className="mb-6 space-y-3">
+                      <p className="text-sm font-semibold text-foreground">Casamento</p>
+                      {renderMarriageFields()}
+                    </div>
+                  )}
+
+                  {otherPersons.length > 0 && (
+                  <>
                   <div>
                     <p className="text-sm font-semibold text-foreground mb-2">Pais/Mães</p>
                     <div className="space-y-1.5">
@@ -382,6 +507,8 @@ const PersonForm: React.FC<PersonFormProps> = ({
                       ))}
                     </div>
                   </div>
+                  </>
+                  )}
                 </>
               )}
             </>

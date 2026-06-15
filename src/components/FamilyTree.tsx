@@ -45,7 +45,7 @@ class TreeErrorBoundary extends React.Component<
   render() {
     if (this.state.hasError) {
       return (
-        <div className="w-full h-[calc(100vh-220px)] min-h-[400px] rounded-xl overflow-hidden border border-destructive bg-destructive/5 flex items-center justify-center px-4">
+        <div className="w-full h-full min-h-0 rounded-xl overflow-hidden border border-destructive bg-destructive/5 flex items-center justify-center px-4">
           <div className="max-w-md text-center">
             <h2 className="font-display text-lg font-semibold text-destructive mb-1">
               Ocorreu um erro ao desenhar a árvore
@@ -462,6 +462,7 @@ const FamilyTree: React.FC<FamilyTreeProps> = ({ onSelectPerson }) => {
           target: rel.relatedPersonId,
           targetHandle: 'spouse-left',
           type: 'spouse',
+          data: { marriageDate: rel.marriageDate },
         });
       }
     });
@@ -660,7 +661,7 @@ const FamilyTree: React.FC<FamilyTreeProps> = ({ onSelectPerson }) => {
   }
 
   return (
-    <div className="w-full h-[calc(100vh-220px)] min-h-[400px] rounded-xl overflow-hidden border border-border bg-card">
+    <div className="w-full h-full min-h-0 rounded-xl overflow-hidden border border-border bg-card">
       <TreeErrorBoundary>
         <ReactFlow
           nodes={nodes}

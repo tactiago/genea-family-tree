@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Person, Gender, getFullName, getParents, getChildren } from '@/types/family';
 import { useFamily } from '@/contexts/FamilyContext';
-import { Heart, MapPin, Briefcase, Calendar, Mail, Phone, ChevronDown, ChevronUp, User, Pencil, Trash2, Plus, Droplet, Mars, Venus } from 'lucide-react';
+import { Heart, MapPin, Briefcase, Calendar, Mail, Phone, ChevronDown, ChevronUp, User, Pencil, Trash2, Plus, Droplet, Mars, Venus, IdCard } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface PersonCardProps {
@@ -9,6 +9,7 @@ interface PersonCardProps {
   compact?: boolean;
   onEdit?: (person: Person) => void;
   onDelete?: (id: string) => void;
+  onSelectPerson?: (person: Person) => void;
   showDetails?: boolean;
   onAddFather?: (child: Person) => void;
   onAddMother?: (child: Person) => void;
@@ -29,6 +30,16 @@ const parseYMD = (date: string) => {
   return { year, month, day };
 };
 
+const MONTHS_PT_SHORT = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'] as const;
+
+const formatMarriageDate = (raw: string): string => {
+  const [year, month, day] = raw.split('-');
+  if (!year) return raw;
+  const monthIndex = Number(month || '1') - 1;
+  const monthLabel = MONTHS_PT_SHORT[monthIndex] ?? month ?? '';
+  return day ? `${Number(day)} ${monthLabel} ${year}` : `${monthLabel} ${year}`;
+};
+
 const calculateAge = (birthDate: string, deathDate?: string | null): number | null => {
   const birth = parseYMD(birthDate);
   if (!birth) return null;
@@ -46,11 +57,15 @@ const calculateAge = (birthDate: string, deathDate?: string | null): number | nu
   return age;
 };
 
+const relativeCardClass =
+  'flex items-center gap-2 rounded-lg border border-border/70 bg-muted/40 px-3 py-2 text-left transition-colors hover:border-primary/40 hover:bg-muted/60';
+
 const PersonCard: React.FC<PersonCardProps> = ({
   person,
   compact = false,
   onEdit,
   onDelete,
+  onSelectPerson,
   showDetails: initialShow = false,
   onAddFather,
   onAddMother,
@@ -58,7 +73,9 @@ const PersonCard: React.FC<PersonCardProps> = ({
   onAddSpouse,
 }) => {
   const [showDetails, setShowDetails] = useState(initialShow);
-  const { relationships, getPerson } = useFamily();
+  const { relationships, getPerson, updateRelationship } = useFamily();
+  const [marriageDrafts, setMarriageDrafts] = useState<Record<string, { marriageDate: string; marriagePlace: string }>>({});
+  const [editingMarriageId, setEditingMarriageId] = useState<string | null>(null);
 
   const spouseRels = relationships.filter(
     r => r.type === 'spouse' && (r.personId === person.id || r.relatedPersonId === person.id)
@@ -82,8 +99,36 @@ const PersonCard: React.FC<PersonCardProps> = ({
 
   const age = person.birthDate ? calculateAge(person.birthDate, person.deathDate || null) : null;
 
-  const hasContactInfo = person.email || person.phone || person.address;
+  const hasContactInfo = person.email || person.phone || person.address || person.documentNumber;
   const hasBioInfo = person.birthPlace || person.profession || person.interests || person.notes;
+
+  const renderRelativeCard = (relative: Person, label: string, className = relativeCardClass) => {
+    const content = (
+      <>
+        <div className="h-8 w-8 rounded-full bg-green-light flex items-center justify-center overflow-hidden flex-shrink-0">
+          {relative.photoUrl ? (
+            <img src={relative.photoUrl} alt={relative.firstName} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
+          ) : (
+            <User className="h-4 w-4 text-primary" />
+          )}
+        </div>
+        <div className="min-w-0">
+          <p className="text-xs font-medium text-foreground truncate">{getFullName(relative)}</p>
+          <p className="text-[11px] text-muted-foreground truncate">{label}</p>
+        </div>
+      </>
+    );
+
+    if (onSelectPerson) {
+      return (
+        <button type="button" onClick={() => onSelectPerson(relative)} className={`${className} w-full cursor-pointer`}>
+          {content}
+        </button>
+      );
+    }
+
+    return <div className={className}>{content}</div>;
+  };
 
   if (compact) {
     return (
@@ -168,6 +213,12 @@ const PersonCard: React.FC<PersonCardProps> = ({
                   {person.deathDate ? `${age} anos (†)` : `${age} anos`}
                 </span>
               )}
+              {person.documentNumber && (
+                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                  <IdCard className="h-3 w-3" />
+                  {person.documentNumber}
+                </span>
+              )}
               {person.profession && (
                 <span className="text-xs text-muted-foreground flex items-center gap-1">
                   <Briefcase className="h-3 w-3" />
@@ -180,19 +231,122 @@ const PersonCard: React.FC<PersonCardProps> = ({
 
         {/* Spouse badge */}
         {(spouseRels.length > 0 || (onAddSpouse && spouseRels.length === 0)) && (
-          <div className="mt-3 flex flex-wrap gap-1.5">
+          <div className="mt-3 space-y-2">
             {spouseRels.map(r => {
               const spouseId = r.personId === person.id ? r.relatedPersonId : r.personId;
               const spouse = getPerson(spouseId);
               if (!spouse) return null;
+              const isEditing = editingMarriageId === r.id;
+              const draft = marriageDrafts[r.id] ?? {
+                marriageDate: r.marriageDate || '',
+                marriagePlace: r.marriagePlace || '',
+              };
+
+              const startEditingMarriage = () => {
+                setEditingMarriageId(r.id);
+                setMarriageDrafts(prev => ({
+                  ...prev,
+                  [r.id]: {
+                    marriageDate: r.marriageDate || '',
+                    marriagePlace: r.marriagePlace || '',
+                  },
+                }));
+              };
+
+              const saveMarriage = () => {
+                updateRelationship(r.id, {
+                  marriageDate: draft.marriageDate || undefined,
+                  marriagePlace: draft.marriagePlace || undefined,
+                });
+                setEditingMarriageId(null);
+              };
+
               return (
-                <span
+                <div
                   key={r.id}
-                  className="text-xs bg-gold-light text-foreground px-2 py-1 rounded-full flex items-center gap-1"
+                  className="rounded-lg border border-gold/30 bg-gold-light/40 px-3 py-2"
                 >
-                  <Heart className="h-3 w-3 text-gold" />
-                  {getFullName(spouse)}
-                </span>
+                  <div className="flex items-center gap-1.5">
+                    <Heart className="h-3 w-3 text-gold flex-shrink-0" />
+                    <span className="text-xs font-medium text-foreground flex-1">{getFullName(spouse)}</span>
+                    {showDetails && !isEditing && (
+                      <button
+                        type="button"
+                        onClick={startEditingMarriage}
+                        className="text-[11px] text-gold hover:underline"
+                      >
+                        {r.marriageDate || r.marriagePlace ? 'Editar' : 'Adicionar casamento'}
+                      </button>
+                    )}
+                  </div>
+
+                  {isEditing ? (
+                    <div className="mt-2 space-y-2 pl-4">
+                      <div>
+                        <label className="block text-[11px] font-medium text-foreground mb-1">Data do casamento</label>
+                        <input
+                          type="date"
+                          className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs"
+                          value={draft.marriageDate}
+                          onChange={e =>
+                            setMarriageDrafts(prev => ({
+                              ...prev,
+                              [r.id]: { ...draft, marriageDate: e.target.value },
+                            }))
+                          }
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-medium text-foreground mb-1">Local do casamento</label>
+                        <input
+                          type="text"
+                          className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs"
+                          placeholder="Ex: Lisboa, Portugal"
+                          value={draft.marriagePlace}
+                          onChange={e =>
+                            setMarriageDrafts(prev => ({
+                              ...prev,
+                              [r.id]: { ...draft, marriagePlace: e.target.value },
+                            }))
+                          }
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={saveMarriage}
+                          className="flex-1 rounded-md bg-gold px-2 py-1.5 text-[11px] font-medium text-foreground"
+                        >
+                          Salvar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditingMarriageId(null)}
+                          className="flex-1 rounded-md border border-border px-2 py-1.5 text-[11px] text-muted-foreground"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    (r.marriageDate || r.marriagePlace) && (
+                      <div className="mt-1.5 space-y-0.5 pl-4">
+                        {r.marriageDate && (
+                          <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+                            <Calendar className="h-3 w-3 flex-shrink-0" />
+                            {formatMarriageDate(r.marriageDate)}
+                          </p>
+                        )}
+                        {r.marriagePlace && (
+                          <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+                            <MapPin className="h-3 w-3 flex-shrink-0" />
+                            {r.marriagePlace}
+                          </p>
+                        )}
+                      </div>
+                    )
+                  )}
+                </div>
               );
             })}
 
@@ -216,45 +370,9 @@ const PersonCard: React.FC<PersonCardProps> = ({
               Pais
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {father && (
-                <div className="flex items-center gap-2 rounded-lg border border-border/70 bg-muted/40 px-3 py-2">
-                  <div className="h-8 w-8 rounded-full bg-green-light flex items-center justify-center overflow-hidden flex-shrink-0">
-                    {father.photoUrl ? (
-                      <img src={father.photoUrl} alt={father.firstName} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
-                    ) : (
-                      <User className="h-4 w-4 text-primary" />
-                    )}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium text-foreground truncate">
-                      {getFullName(father)}
-                    </p>
-                    <p className="text-[11px] text-muted-foreground truncate">
-                      Pai
-                    </p>
-                  </div>
-                </div>
-              )}
+              {father && renderRelativeCard(father, 'Pai')}
 
-              {mother && (
-                <div className="flex items-center gap-2 rounded-lg border border-border/70 bg-muted/40 px-3 py-2">
-                  <div className="h-8 w-8 rounded-full bg-green-light flex items-center justify-center overflow-hidden flex-shrink-0">
-                    {mother.photoUrl ? (
-                      <img src={mother.photoUrl} alt={mother.firstName} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
-                    ) : (
-                      <User className="h-4 w-4 text-primary" />
-                    )}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium text-foreground truncate">
-                      {getFullName(mother)}
-                    </p>
-                    <p className="text-[11px] text-muted-foreground truncate">
-                      Mãe
-                    </p>
-                  </div>
-                </div>
-              )}
+              {mother && renderRelativeCard(mother, 'Mãe')}
 
               {!father && onAddFather && (
                 <button
@@ -279,26 +397,9 @@ const PersonCard: React.FC<PersonCardProps> = ({
               )}
 
               {otherParents.map((p) => (
-                <div
-                  key={p.id}
-                  className="flex items-center gap-2 rounded-lg border border-border/70 bg-muted/30 px-3 py-2"
-                >
-                  <div className="h-8 w-8 rounded-full bg-green-light flex items-center justify-center overflow-hidden flex-shrink-0">
-                    {p.photoUrl ? (
-                      <img src={p.photoUrl} alt={p.firstName} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
-                    ) : (
-                      <User className="h-4 w-4 text-primary" />
-                    )}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium text-foreground truncate">
-                      {getFullName(p)}
-                    </p>
-                    <p className="text-[11px] text-muted-foreground truncate">
-                      Responsável
-                    </p>
-                  </div>
-                </div>
+                <React.Fragment key={p.id}>
+                  {renderRelativeCard(p, 'Responsável', 'flex items-center gap-2 rounded-lg border border-border/70 bg-muted/30 px-3 py-2 text-left transition-colors hover:border-primary/40 hover:bg-muted/50')}
+                </React.Fragment>
               ))}
             </div>
           </div>
@@ -308,23 +409,43 @@ const PersonCard: React.FC<PersonCardProps> = ({
               Filhos
             </p>
             <div className="flex flex-wrap gap-2">
-              {children.map((child) => (
-                <div
-                  key={child.id}
-                  className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-muted/30 px-3 py-1"
-                >
-                  <div className="h-7 w-7 rounded-full bg-green-light flex items-center justify-center overflow-hidden flex-shrink-0">
-                    {child.photoUrl ? (
-                      <img src={child.photoUrl} alt={child.firstName} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
-                    ) : (
-                      <User className="h-3.5 w-3.5 text-primary" />
-                    )}
+              {children.map((child) =>
+                onSelectPerson ? (
+                  <button
+                    key={child.id}
+                    type="button"
+                    onClick={() => onSelectPerson(child)}
+                    className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-muted/30 px-3 py-1 transition-colors hover:border-primary/40 hover:bg-muted/50 cursor-pointer"
+                  >
+                    <div className="h-7 w-7 rounded-full bg-green-light flex items-center justify-center overflow-hidden flex-shrink-0">
+                      {child.photoUrl ? (
+                        <img src={child.photoUrl} alt={child.firstName} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
+                      ) : (
+                        <User className="h-3.5 w-3.5 text-primary" />
+                      )}
+                    </div>
+                    <span className="text-xs font-medium text-foreground max-w-[140px] truncate">
+                      {getFullName(child)}
+                    </span>
+                  </button>
+                ) : (
+                  <div
+                    key={child.id}
+                    className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-muted/30 px-3 py-1"
+                  >
+                    <div className="h-7 w-7 rounded-full bg-green-light flex items-center justify-center overflow-hidden flex-shrink-0">
+                      {child.photoUrl ? (
+                        <img src={child.photoUrl} alt={child.firstName} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
+                      ) : (
+                        <User className="h-3.5 w-3.5 text-primary" />
+                      )}
+                    </div>
+                    <span className="text-xs font-medium text-foreground max-w-[140px] truncate">
+                      {getFullName(child)}
+                    </span>
                   </div>
-                  <span className="text-xs font-medium text-foreground max-w-[140px] truncate">
-                    {getFullName(child)}
-                  </span>
-                </div>
-              ))}
+                ),
+              )}
 
               {onAddChild && (
                 <button
@@ -378,6 +499,11 @@ const PersonCard: React.FC<PersonCardProps> = ({
                       {person.address && (
                         <p className="text-sm text-foreground flex items-center gap-2">
                           <MapPin className="h-3.5 w-3.5 text-muted-foreground" /> {person.address}
+                        </p>
+                      )}
+                      {person.documentNumber && (
+                        <p className="text-sm text-foreground flex items-center gap-2">
+                          <IdCard className="h-3.5 w-3.5 text-muted-foreground" /> {person.documentNumber}
                         </p>
                       )}
                     </div>

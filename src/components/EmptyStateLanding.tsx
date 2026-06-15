@@ -35,7 +35,7 @@ const EmptyStateLanding: React.FC<EmptyStateLandingProps> = ({ onAddPerson, onIm
   };
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] flex flex-col relative overflow-hidden">
+    <div className="min-h-full flex flex-col relative overflow-hidden">
       {/* Subtle decorative background */}
       <div className="absolute inset-0 pointer-events-none -z-10">
         <div className="absolute top-1/4 -left-32 w-96 h-96 rounded-full bg-primary/5 blur-3xl" />
