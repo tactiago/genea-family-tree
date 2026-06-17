@@ -141,15 +141,15 @@ const OrganogramNode: React.FC<OrganogramNodeProps> = ({
               )}
             </div>
 
-            <div className="relative -mt-3 w-full flex justify-center px-1">
+            <div className="relative -mt-3 z-20 flex w-full justify-center px-1">
               <div
-                className="relative max-w-[124px] rounded-md px-3 py-1 text-center shadow-sm"
+                className="relative flex min-h-[44px] w-full max-w-[124px] items-center justify-center rounded-md px-2 py-1.5 text-center shadow-sm"
                 style={{
                   background: 'linear-gradient(180deg, #f5d565 0%, #e8b84a 100%)',
                   borderBottom: '2px solid #c99a2e',
                 }}
               >
-                <p className="text-[11px] font-bold leading-tight text-amber-950 truncate">
+                <p className="text-[11px] font-bold leading-snug text-amber-950 whitespace-normal break-words">
                   {getFullName(person)}
                 </p>
               </div>

@@ -66,7 +66,7 @@ export const ORGANOGRAM_FIELDS: OrganogramFieldDef[] = [
     label: 'Idade',
     getValue: (p, age) => {
       if (age === null) return null;
-      return p.deathDate ? `${age} anos (†)` : `${age} anos`;
+      return `${age} anos`;
     },
   },
   {
@@ -137,10 +137,18 @@ export const getPersonFieldLines = (
   visibleFields: Set<OrganogramFieldId>,
 ): Array<{ label: string; value: string }> => {
   const age = person.birthDate ? calculateAge(person.birthDate, person.deathDate || null) : null;
+  const showAgeOnDeathLine =
+    visibleFields.has('birthDate') &&
+    visibleFields.has('deathDate') &&
+    Boolean(person.birthDate && person.deathDate);
 
   return ORGANOGRAM_FIELDS.filter((f) => visibleFields.has(f.id))
+    .filter((f) => !(f.id === 'age' && showAgeOnDeathLine))
     .map((f) => {
-      const value = f.getValue(person, age);
+      let value = f.getValue(person, age);
+      if (f.id === 'deathDate' && value && showAgeOnDeathLine && age !== null) {
+        value = `${value} · ${age} anos`;
+      }
       return value ? { label: f.label, value } : null;
     })
     .filter((line): line is { label: string; value: string } => Boolean(line));

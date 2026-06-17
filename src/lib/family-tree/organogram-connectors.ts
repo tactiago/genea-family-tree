@@ -1,6 +1,7 @@
 import { Relationship, getParents } from '@/types/family';
 import type { PersonLayoutPosition } from './pedigree-layout';
-import type { ConnectorPath, SiblingGroup } from './connectors';
+import type { SiblingGroup } from './connectors';
+import type { OrganogramConnectorPath } from './organogram-highlight';
 import {
   AVATAR_SIZE,
   getAvatarCenterY,
@@ -11,6 +12,7 @@ import {
 
 export { buildSiblingGroups } from './connectors';
 export type { SiblingGroup, ConnectorPath } from './connectors';
+export type { OrganogramConnectorPath } from './organogram-highlight';
 
 interface ParentAnchor {
   id: string;
@@ -45,8 +47,8 @@ export const buildOrganogramCoupleDropPaths = (
   spouseLinks: Array<{ id: string; personAId: string; personBId: string }>,
   positions: Map<string, PersonLayoutPosition>,
   siblingGroups: SiblingGroup[],
-): ConnectorPath[] => {
-  const paths: ConnectorPath[] = [];
+): OrganogramConnectorPath[] => {
+  const paths: OrganogramConnectorPath[] = [];
   const parentKeysWithChildren = new Set(siblingGroups.map((g) => g.parentKey));
 
   spouseLinks.forEach((link) => {
@@ -56,6 +58,11 @@ export const buildOrganogramCoupleDropPaths = (
 
     const parentKey = [link.personAId, link.personBId].sort().join(':');
     if (!parentKeysWithChildren.has(parentKey)) return;
+
+    const group = siblingGroups.find((g) => g.parentKey === parentKey);
+    const personIds = group
+      ? [...new Set([link.personAId, link.personBId, ...group.childIds])]
+      : [link.personAId, link.personBId];
 
     const left = posA.x < posB.x ? posA : posB;
     const midX = (left.x + left.width + (posA.x < posB.x ? posB : posA).x) / 2;
@@ -67,6 +74,8 @@ export const buildOrganogramCoupleDropPaths = (
     paths.push({
       id: `couple-drop-${link.id}`,
       d: `M ${midX} ${midY} L ${midX} ${bottomY}`,
+      kind: 'couple-drop',
+      personIds,
     });
   });
 
@@ -77,8 +86,8 @@ export const buildOrganogramSiblingBusPaths = (
   groups: SiblingGroup[],
   positions: Map<string, PersonLayoutPosition>,
   spouseLinks: Array<{ personAId: string; personBId: string }> = [],
-): ConnectorPath[] => {
-  const paths: ConnectorPath[] = [];
+): OrganogramConnectorPath[] => {
+  const paths: OrganogramConnectorPath[] = [];
 
   groups.forEach((group) => {
     const parentPositions = group.parentIds
@@ -146,6 +155,8 @@ export const buildOrganogramSiblingBusPaths = (
     paths.push({
       id: `bus-${group.parentKey}`,
       d: segments.join(' '),
+      kind: 'bus',
+      personIds: [...new Set([...group.parentIds, ...group.childIds])],
     });
   });
 

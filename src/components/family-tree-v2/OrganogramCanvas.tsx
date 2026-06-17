@@ -17,12 +17,18 @@ import {
   buildOrganogramSiblingBusPaths,
   buildOrganogramCoupleDropPaths,
   buildOrganogramSpouseSegment,
+  type OrganogramConnectorPath,
 } from '@/lib/family-tree/organogram-connectors';
 import {
   getPersonFieldLines,
   formatOrganogramDate,
   type OrganogramFieldId,
 } from '@/lib/family-tree/organogram-fields';
+import {
+  computeOrganogramHighlight,
+  DIMMED_OPACITY,
+  type OrganogramHoverState,
+} from '@/lib/family-tree/organogram-highlight';
 
 interface OrganogramCanvasProps {
   persons: Person[];
@@ -42,6 +48,34 @@ interface ViewTransform {
   scale: number;
 }
 
+const ConnectorPathLayer: React.FC<{
+  path: OrganogramConnectorPath;
+  stroke: string;
+  strokeWidth?: number;
+  strokeDasharray?: string;
+  dimmed: boolean;
+  onHoverStart: (connectorId: string) => void;
+}> = ({ path, stroke, strokeWidth = 2, strokeDasharray, dimmed, onHoverStart }) => (
+  <g className="transition-opacity duration-200" style={{ opacity: dimmed ? DIMMED_OPACITY : 1 }}>
+    <path
+      d={path.d}
+      fill="none"
+      stroke="transparent"
+      strokeWidth={14}
+      style={{ cursor: 'pointer' }}
+      onMouseEnter={() => onHoverStart(path.id)}
+    />
+    <path
+      d={path.d}
+      fill="none"
+      stroke={stroke}
+      strokeWidth={strokeWidth}
+      strokeDasharray={strokeDasharray}
+      pointerEvents="none"
+    />
+  </g>
+);
+
 const OrganogramCanvas: React.FC<OrganogramCanvasProps> = ({
   persons,
   relationships,
@@ -55,6 +89,7 @@ const OrganogramCanvas: React.FC<OrganogramCanvasProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [transform, setTransform] = useState<ViewTransform>({ x: 48, y: 48, scale: 1 });
+  const [hover, setHover] = useState<OrganogramHoverState>({ type: 'none' });
   const dragRef = useRef<{ startX: number; startY: number; originX: number; originY: number } | null>(
     null,
   );
@@ -78,13 +113,30 @@ const OrganogramCanvas: React.FC<OrganogramCanvasProps> = ({
 
   const personById = useMemo(() => new Map(persons.map((p) => [p.id, p])), [persons]);
 
-  const { siblingBusPaths, coupleDropPaths } = useMemo(() => {
+  const { siblingBusPaths, coupleDropPaths, allConnectors } = useMemo(() => {
     const groups = buildOrganogramSiblingGroups(visibleIds, relationships);
+    const busPaths = buildOrganogramSiblingBusPaths(groups, layout.positions, layout.spouseLinks);
+    const dropPaths = buildOrganogramCoupleDropPaths(layout.spouseLinks, layout.positions, groups);
+    const spousePaths: OrganogramConnectorPath[] = layout.spouseLinks.map((link) => ({
+      id: `spouse-${link.id}`,
+      d: '',
+      kind: 'spouse',
+      personIds: [link.personAId, link.personBId],
+    }));
+
     return {
-      siblingBusPaths: buildOrganogramSiblingBusPaths(groups, layout.positions, layout.spouseLinks),
-      coupleDropPaths: buildOrganogramCoupleDropPaths(layout.spouseLinks, layout.positions, groups),
+      siblingBusPaths: busPaths,
+      coupleDropPaths: dropPaths,
+      allConnectors: [...dropPaths, ...busPaths, ...spousePaths],
     };
   }, [visibleIds, relationships, layout.positions, layout.spouseLinks]);
+
+  const { highlightedPeople, highlightedConnectors } = useMemo(
+    () => computeOrganogramHighlight(hover, allConnectors),
+    [hover, allConnectors],
+  );
+
+  const isHighlighting = highlightedPeople !== null;
 
   const fitToView = useCallback(() => {
     const el = containerRef.current;
@@ -109,12 +161,12 @@ const OrganogramCanvas: React.FC<OrganogramCanvasProps> = ({
 
     if (rootChanged) {
       fitToView();
+      setHover({ type: 'none' });
     }
   }, [fitToView, rootPersonId]);
 
   useEffect(() => {
     fitToView();
-    // Centraliza apenas na montagem inicial; expand/collapse não alteram zoom/pan.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -159,6 +211,28 @@ const OrganogramCanvas: React.FC<OrganogramCanvasProps> = ({
       (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
     }
   }, []);
+
+  const handleConnectorHover = useCallback((connectorId: string) => {
+    setHover({ type: 'connector', connectorId });
+  }, []);
+
+  const handlePersonHover = useCallback((personId: string) => {
+    setHover({ type: 'person', personId });
+  }, []);
+
+  const handleHoverEnd = useCallback(() => {
+    setHover({ type: 'none' });
+  }, []);
+
+  const isConnectorDimmed = useCallback(
+    (connectorId: string) => isHighlighting && !highlightedConnectors!.has(connectorId),
+    [isHighlighting, highlightedConnectors],
+  );
+
+  const isPersonDimmed = useCallback(
+    (personId: string) => isHighlighting && !highlightedPeople!.has(personId),
+    [isHighlighting, highlightedPeople],
+  );
 
   return (
     <div className="relative w-full h-full">
@@ -206,28 +280,29 @@ const OrganogramCanvas: React.FC<OrganogramCanvasProps> = ({
             height: layout.bounds.height,
             position: 'relative',
           }}
+          onMouseLeave={handleHoverEnd}
         >
           <svg
-            className="absolute inset-0 pointer-events-none"
+            className="absolute inset-0"
             width={layout.bounds.width}
             height={layout.bounds.height}
           >
             {coupleDropPaths.map((path) => (
-              <path
+              <ConnectorPathLayer
                 key={path.id}
-                d={path.d}
-                fill="none"
+                path={path}
                 stroke="hsl(var(--tree-line))"
-                strokeWidth={2}
+                dimmed={isConnectorDimmed(path.id)}
+                onHoverStart={handleConnectorHover}
               />
             ))}
             {siblingBusPaths.map((path) => (
-              <path
+              <ConnectorPathLayer
                 key={path.id}
-                d={path.d}
-                fill="none"
+                path={path}
                 stroke="hsl(var(--tree-line))"
-                strokeWidth={2}
+                dimmed={isConnectorDimmed(path.id)}
+                onHoverStart={handleConnectorHover}
               />
             ))}
             {layout.spouseLinks.map((link) => {
@@ -235,11 +310,26 @@ const OrganogramCanvas: React.FC<OrganogramCanvasProps> = ({
               const posB = layout.positions.get(link.personBId);
               if (!posA || !posB) return null;
 
+              const connectorId = `spouse-${link.id}`;
               const { x1, y, x2 } = buildOrganogramSpouseSegment(posA, posB);
               const midX = (x1 + x2) / 2;
+              const dimmed = isConnectorDimmed(connectorId);
 
               return (
-                <g key={link.id}>
+                <g
+                  key={link.id}
+                  className="transition-opacity duration-200"
+                  style={{ opacity: dimmed ? DIMMED_OPACITY : 1, cursor: 'pointer' }}
+                  onMouseEnter={() => handleConnectorHover(connectorId)}
+                >
+                  <line
+                    x1={x1}
+                    y1={y}
+                    x2={x2}
+                    y2={y}
+                    stroke="transparent"
+                    strokeWidth={14}
+                  />
                   <line
                     x1={x1}
                     y1={y}
@@ -248,9 +338,17 @@ const OrganogramCanvas: React.FC<OrganogramCanvasProps> = ({
                     stroke="hsl(var(--gold))"
                     strokeWidth={2}
                     strokeDasharray="6 3"
+                    pointerEvents="none"
                   />
-                  <circle cx={midX} cy={y} r={10} fill="hsl(var(--card))" />
-                  <text x={midX} y={y + 3} textAnchor="middle" fontSize={10} fill="hsl(var(--gold))">
+                  <circle cx={midX} cy={y} r={10} fill="hsl(var(--card))" pointerEvents="none" />
+                  <text
+                    x={midX}
+                    y={y + 3}
+                    textAnchor="middle"
+                    fontSize={10}
+                    fill="hsl(var(--gold))"
+                    pointerEvents="none"
+                  >
                     ♥
                   </text>
                   {link.marriageDate && (
@@ -260,6 +358,7 @@ const OrganogramCanvas: React.FC<OrganogramCanvasProps> = ({
                       textAnchor="middle"
                       fontSize={9}
                       fill="hsl(var(--muted-foreground))"
+                      pointerEvents="none"
                     >
                       {formatOrganogramDate(link.marriageDate)}
                     </text>
@@ -281,12 +380,19 @@ const OrganogramCanvas: React.FC<OrganogramCanvasProps> = ({
               relationships,
             );
             const fieldLines = getPersonFieldLines(person, visibleFields);
+            const dimmed = isPersonDimmed(pos.id);
 
             return (
               <div
                 key={pos.id}
-                className="absolute"
-                style={{ left: pos.x, top: pos.y, width: NODE_WIDTH }}
+                className="absolute z-[1] transition-opacity duration-200"
+                style={{
+                  left: pos.x,
+                  top: pos.y,
+                  width: NODE_WIDTH,
+                  opacity: dimmed ? DIMMED_OPACITY : 1,
+                }}
+                onMouseEnter={() => handlePersonHover(pos.id)}
               >
                 <OrganogramNode
                   person={person}

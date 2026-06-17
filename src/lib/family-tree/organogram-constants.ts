@@ -3,7 +3,7 @@ import type { OrganogramFieldId } from './organogram-fields';
 export const AVATAR_SIZE = 88;
 export const AVATAR_RING = 4;
 export const NODE_WIDTH = 132;
-export const RIBBON_HEIGHT = 28;
+export const RIBBON_HEIGHT = 52;
 export const RIBBON_OVERLAP = 12;
 export const INFO_LINE_HEIGHT = 14;
 export const NODE_PADDING_BOTTOM = 6;
